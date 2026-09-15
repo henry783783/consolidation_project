@@ -8,23 +8,29 @@ A Wordle-style word-guessing game designed for static hosting on GitHub Pages.
 
 The player attempts to guess a hidden five-letter word within a limited number of attempts.
 
-For each submitted guess, letters will eventually be evaluated as:
+For each submitted guess, letters are evaluated as:
 
 - **Correct position** — the letter is in the target word and in the correct position.
 - **Wrong position** — the letter is in the target word but in a different position.
-- **Not present** — the letter does not occur in the target word, subject to normal Wordle duplicate-letter rules.
+- **Not present** — the letter does not have an unused occurrence in the target.
+
+Duplicate letters must follow normal Wordle-style matching rules.
 
 The game provides both physical keyboard and on-screen keyboard input.
 
 ## Current stage
 
-Stage 5 adds actual guess submission and validation.
+Stage 6 adds Wordle-style guess evaluation.
 
-The development target is currently the fixed word `CRANE`. A small self-contained list of five-letter words is used to determine whether a submitted guess is accepted.
+The development target remains the fixed word `CRANE`. Valid guesses are evaluated after submission and their five tiles receive visual states for:
 
-A valid five-letter word advances the player to the next row. An incomplete or unrecognised word remains on the current row and displays a validation message.
+- `correct`
+- `present`
+- `absent`
 
-Letter evaluation and win/loss behaviour are deliberately deferred to later stages.
+The evaluation uses a two-pass algorithm so duplicate letters are not incorrectly counted.
+
+Win/loss handling is deliberately deferred to Stage 7.
 
 ## Scope boundaries
 
