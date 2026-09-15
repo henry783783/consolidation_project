@@ -1,6 +1,6 @@
 /*
   Wordle-style game
-  Stage 7: Win/loss flow
+  Stage 8: Polish and accessibility
 
   This file controls:
   - Physical keyboard input.
@@ -8,11 +8,11 @@
   - Backspace.
   - Five-letter guess validation.
   - Wordle-style letter evaluation.
+  - Accessible descriptions for evaluated tiles.
   - Win/loss detection.
   - New-game/reset behaviour.
 
   The target remains fixed as CRANE during development.
-  Random target selection will be introduced separately later.
 */
 
 "use strict";
@@ -85,12 +85,10 @@ const statusMessage = document.querySelector(".stage-status");
 const newGameButton = document.querySelector("#new-game");
 
 /*
-  Establish the initial UI state immediately.
+  Establish the initial UI state explicitly.
 
-  The New Game button should only be available after the
-  current game has ended. Setting this explicitly here means
-  the page starts in a known state even if the browser has
-  retained an older CSS version in its cache.
+  This ensures the New Game button starts hidden even
+  if a browser has retained an older stylesheet.
 */
 if (newGameButton) {
   newGameButton.hidden = true;
@@ -98,12 +96,6 @@ if (newGameButton) {
 
 let currentRow = 0;
 let currentTile = 0;
-
-/*
-  True once the player has either won or lost.
-
-  All letter and action input is ignored while the game is over.
-*/
 let gameOver = false;
 
 /* ------------------------------
@@ -135,6 +127,24 @@ function showMessage(message) {
   }
 }
 
+/*
+  Give a typed tile a useful accessible description.
+
+  The visible letter remains unchanged. The aria-label gives
+  assistive technology enough information to understand the
+  active guess as it is being entered.
+*/
+function updateTileInputLabel(tile, letter, rowIndex, tileIndex) {
+  if (!tile) {
+    return;
+  }
+
+  tile.setAttribute(
+    "aria-label",
+    `Guess ${rowIndex + 1}, position ${tileIndex + 1}: ${letter}`
+  );
+}
+
 /* ------------------------------
    Letter input
    ------------------------------ */
@@ -150,7 +160,17 @@ function addLetter(letter) {
     return;
   }
 
-  tiles[currentTile].textContent = letter.toUpperCase();
+  const upperLetter = letter.toUpperCase();
+
+  tiles[currentTile].textContent = upperLetter;
+
+  updateTileInputLabel(
+    tiles[currentTile],
+    upperLetter,
+    currentRow,
+    currentTile
+  );
+
   currentTile += 1;
 }
 
@@ -165,6 +185,7 @@ function removeLetter() {
 
   if (tiles[currentTile]) {
     tiles[currentTile].textContent = "";
+    tiles[currentTile].removeAttribute("aria-label");
   }
 }
 
@@ -213,15 +234,41 @@ function evaluateGuess(guess) {
   return results;
 }
 
+function getResultDescription(result) {
+  if (result === "correct") {
+    return "correct position";
+  }
+
+  if (result === "present") {
+    return "correct letter, wrong position";
+  }
+
+  return "letter not present";
+}
+
 function displayEvaluation(results, rowIndex) {
   const tiles = Array.from(
     rows[rowIndex].querySelectorAll(".tile")
   ).slice(0, WORD_LENGTH);
 
   results.forEach((result, index) => {
-    if (tiles[index]) {
-      tiles[index].classList.add(result);
+    if (!tiles[index]) {
+      return;
     }
+
+    const letter = tiles[index].textContent.trim();
+
+    tiles[index].classList.add(result);
+
+    /*
+      The visual colour communicates the result to sighted users.
+      The aria-label communicates the same result to users who
+      cannot rely on colour.
+    */
+    tiles[index].setAttribute(
+      "aria-label",
+      `Guess ${rowIndex + 1}, position ${index + 1}: ${letter}, ${getResultDescription(result)}`
+    );
   });
 }
 
@@ -238,9 +285,6 @@ function endGame(won) {
     showMessage(`Game over — the word was ${targetWord}.`);
   }
 
-  /*
-    Make the New Game button available once the current game ends.
-  */
   if (newGameButton) {
     newGameButton.hidden = false;
   }
@@ -251,9 +295,6 @@ function endGame(won) {
    ------------------------------ */
 
 function submitGuess() {
-  /*
-    Nothing can be submitted after the game ends.
-  */
   if (gameOver) {
     return;
   }
@@ -278,20 +319,11 @@ function submitGuess() {
   const results = evaluateGuess(guess);
   displayEvaluation(results, currentRow);
 
-  /*
-    A correct target guess immediately ends the game.
-  */
   if (guess === targetWord) {
     endGame(true);
     return;
   }
 
-  /*
-    This was an incorrect but valid guess.
-
-    currentRow is zero-based, so the sixth completed row has
-    index MAX_GUESSES - 1.
-  */
   if (currentRow === MAX_GUESSES - 1) {
     endGame(false);
     return;
@@ -308,14 +340,12 @@ function submitGuess() {
    ------------------------------ */
 
 function startNewGame() {
-  /*
-    Clear every tile and every evaluation class.
-  */
   rows.forEach((row) => {
     const tiles = row.querySelectorAll(".tile");
 
     tiles.forEach((tile) => {
       tile.textContent = "";
+      tile.removeAttribute("aria-label");
       tile.classList.remove("correct", "present", "absent");
     });
   });
@@ -324,7 +354,7 @@ function startNewGame() {
   currentTile = 0;
   gameOver = false;
 
-  showMessage("Stage 7: Win/loss flow");
+  showMessage("Stage 8: Polish and accessibility");
 
   if (newGameButton) {
     newGameButton.hidden = true;
