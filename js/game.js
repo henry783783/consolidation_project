@@ -46,7 +46,7 @@ function getTiles(rowIndex) {
   Add a letter to the current position.
 */
 function addLetter(letter) {
-  // A Wordle guess contains exactly five letters.
+  // A Wordle guess contains no more than five letters.
   if (currentTile >= 5) {
     return;
   }
@@ -91,8 +91,8 @@ function moveToNextRow() {
 /*
   Handle a letter from either input source.
 
-  Keeping this small wrapper means the physical keyboard and
-  on-screen keyboard use exactly the same letter-entry behaviour.
+  Both the physical keyboard and the on-screen keyboard use this
+  same function, so their behaviour stays consistent.
 */
 function handleLetter(letter) {
   if (/^[a-zA-Z]$/.test(letter)) {
@@ -101,7 +101,7 @@ function handleLetter(letter) {
 }
 
 /*
-  Handle a keyboard action from either input source.
+  Handle an action from either input source.
 
   "backspace" removes a letter.
   "enter" is intentionally ignored until Stage 5.
@@ -113,7 +113,7 @@ function handleAction(action) {
   }
 
   if (action === "enter") {
-    // Submission is intentionally not implemented yet.
+    // Guess submission is intentionally not implemented yet.
   }
 }
 
@@ -151,30 +151,28 @@ document.addEventListener("keydown", (event) => {
    On-screen keyboard
    ------------------------------ */
 
-const keyboard = document.querySelector(".keyboard");
-
 /*
-  Use event delegation rather than adding a separate listener to
-  every button. This keeps the JavaScript smaller and makes the
-  keyboard easier to maintain.
+  Find every on-screen keyboard button directly.
+
+  Direct listeners are deliberately used here instead of event
+  delegation. There are only 28 buttons, so this is easy to understand
+  and makes each button's connection to the input system explicit.
 */
-keyboard.addEventListener("click", (event) => {
-  const button = event.target.closest("button");
+const keyboardButtons = document.querySelectorAll(".keyboard button");
 
-  if (!button) {
-    return;
-  }
+keyboardButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const key = button.dataset.key;
 
-  const key = button.dataset.key;
+    if (!key) {
+      return;
+    }
 
-  if (!key) {
-    return;
-  }
+    if (key === "backspace" || key === "enter") {
+      handleAction(key);
+      return;
+    }
 
-  if (key === "backspace" || key === "enter") {
-    handleAction(key);
-    return;
-  }
-
-  handleLetter(key);
+    handleLetter(key);
+  });
 });
