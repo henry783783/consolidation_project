@@ -1,3 +1,8 @@
+# Architecture
+
+## Current repository structure
+
+```text
 /
 ├── context/
 │   ├── ARCHITECTURE.md
