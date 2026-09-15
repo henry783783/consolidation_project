@@ -1,5 +1,5 @@
 
-- `context/STAGE_PLAN.md` (new)
+- `context/STAGE_PLAN.md` (modified)
 
 ```markdown
 # Stage Plan
@@ -21,11 +21,11 @@ Status values:
   - Add a minimal GitHub Pages entry point.
   - Verify static deployment.
 
-- [ ] **Stage 2 — Board and visual layout**
+- [x] **Stage 2 — Board and visual layout**
   - Add the five-column guess board.
   - Add the six guess rows.
   - Add responsive styling.
-  - No gameplay logic yet.
+  - Keep the board non-interactive.
 
 - [ ] **Stage 3 — Keyboard input and game state**
   - Add JavaScript game state.
@@ -67,4 +67,4 @@ Status values:
 
 Only one stage is implemented at a time.
 
-After each completed stage, the developer must test the live GitHub Pages deployment and explicitly approve the next stage before implementation continues.
+After each completed stage, the developer must test the live GitHub Pages deployment and explicitly approve the next stage before implementation continues.tage before implementation continues.
