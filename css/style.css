@@ -1,9 +1,8 @@
 /*
   Wordle-style game
-  Stage 2: Board and visual layout
+  Stage 4: Board and on-screen keyboard
 
-  This file contains presentation only.
-  Game state and interaction will be added in later stages.
+  Presentation only. Game behaviour is handled by js/game.js.
 */
 
 /* ------------------------------
@@ -15,14 +14,11 @@
   --text-color: #212121;
   --secondary-text: #666666;
   --tile-border: #d3d6da;
+  --keyboard-background: #d3d6da;
+  --keyboard-text: #212121;
   --status-background: #f3f3f3;
   --status-text: #555555;
 
-  /*
-    The tile size is deliberately controlled by one variable.
-    This makes the board easier to adjust later without changing
-    the dimensions in several different places.
-  */
   --tile-size: 62px;
 
   font-family:
@@ -49,6 +45,10 @@ body {
   justify-content: center;
 
   background: var(--page-background);
+}
+
+button {
+  font: inherit;
 }
 
 /* ------------------------------
@@ -90,29 +90,17 @@ body {
    ------------------------------ */
 
 .board {
-  /*
-    Six rows are stacked vertically.
-    The gap is shared by all rows so the board remains consistent.
-  */
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
 
-  /*
-    Provides breathing room between the header and board.
-  */
   margin: 28px 0;
 }
 
 .row {
   display: grid;
-
-  /*
-    Five equal columns make each guess exactly five tiles wide.
-  */
   grid-template-columns: repeat(5, var(--tile-size));
-
   gap: 5px;
 }
 
@@ -127,14 +115,76 @@ body {
   border: 2px solid var(--tile-border);
   background: #ffffff;
 
-  /*
-    Wordle-style tiles are square and contain one letter.
-    The large font size will also work when JavaScript starts
-    placing letters into the tiles.
-  */
   font-size: 2rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+/* ------------------------------
+   On-screen keyboard
+   ------------------------------ */
+
+.keyboard {
+  width: 100%;
+  margin: 8px auto 24px;
+}
+
+.keyboard-row {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+
+  margin-bottom: 6px;
+}
+
+.keyboard-row button {
+  min-width: 38px;
+  height: 52px;
+
+  padding: 0 7px;
+
+  border: 0;
+  border-radius: 4px;
+
+  background: var(--keyboard-background);
+  color: var(--keyboard-text);
+
+  font-size: 0.85rem;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  /*
+    Prevents the browser from showing an awkward text-selection
+    behaviour when the player taps a key repeatedly.
+  */
+  user-select: none;
+
+  /*
+    Gives keyboard buttons a predictable touch target.
+  */
+  touch-action: manipulation;
+}
+
+.keyboard-row button:hover {
+  background: #c4c7ca;
+}
+
+.keyboard-row button:active {
+  background: #aeb1b4;
+}
+
+.keyboard-row button:focus-visible {
+  outline: 3px solid #555555;
+  outline-offset: 2px;
+}
+
+.keyboard-row-middle {
+  padding: 0 4%;
+}
+
+.keyboard-wide {
+  min-width: 58px !important;
 }
 
 /* ------------------------------
@@ -159,12 +209,6 @@ body {
    Mobile layout
    ------------------------------ */
 
-/*
-  On small screens, reduce the tile size so that all five tiles
-  comfortably fit within the available width.
-
-  The board itself remains the same five-by-six structure.
-*/
 @media (max-width: 400px) {
   :root {
     --tile-size: 54px;
@@ -181,12 +225,25 @@ body {
   .board {
     margin: 22px 0;
   }
+
+  .keyboard-row {
+    gap: 3px;
+  }
+
+  .keyboard-row button {
+    min-width: 29px;
+    height: 48px;
+
+    padding: 0 4px;
+
+    font-size: 0.75rem;
+  }
+
+  .keyboard-wide {
+    min-width: 48px !important;
+  }
 }
 
-/*
-  Very narrow screens need slightly smaller tiles.
-  This prevents horizontal scrolling on small phones.
-*/
 @media (max-width: 320px) {
   :root {
     --tile-size: 48px;
@@ -200,7 +257,20 @@ body {
     gap: 4px;
   }
 
-  .tile {
-    border-width: 2px;
+  .keyboard-row {
+    gap: 2px;
+  }
+
+  .keyboard-row button {
+    min-width: 25px;
+    height: 44px;
+
+    padding: 0 3px;
+
+    font-size: 0.7rem;
+  }
+
+  .keyboard-wide {
+    min-width: 43px !important;
   }
 }
