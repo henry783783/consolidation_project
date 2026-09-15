@@ -1,32 +1,26 @@
 /*
   Wordle-style game
-  Stage 3: Keyboard input and game state
+  Stage 4: On-screen keyboard
 
   Responsibilities in this stage:
-  - Track which row is currently being edited.
-  - Track which tile is currently being edited.
+  - Track the active row and tile.
   - Accept physical A-Z keyboard input.
+  - Accept matching input from the on-screen keyboard.
   - Display letters in the active row.
   - Remove the most recently entered letter with Backspace.
 
   Deliberately NOT implemented yet:
   - Guess submission.
-  - Enter-key submission.
   - Word-list validation.
-  - Correct/wrong-position/not-present evaluation.
-  - On-screen keyboard.
+  - Guess evaluation.
   - Win/loss handling.
 
-  Keeping these responsibilities separate makes it easier for a future
-  contributor to add and test each piece without changing unrelated code.
+  Physical and on-screen input both call the same functions.
+  This prevents the two input methods from developing different behaviour.
 */
 
 "use strict";
 
-/*
-  The board already exists in index.html, so JavaScript only needs to
-  find the existing rows and tiles rather than generating new markup.
-*/
 const rows = document.querySelectorAll(".row");
 
 /*
@@ -37,13 +31,6 @@ const rows = document.querySelectorAll(".row");
 
   currentTile:
     Zero-based index of the next empty tile in that row.
-
-  Example:
-    currentRow = 0
-    currentTile = 2
-
-  means the player has entered two letters in the first row and the
-  third tile is the next place a letter will be displayed.
 */
 let currentRow = 0;
 let currentTile = 0;
@@ -57,13 +44,9 @@ function getTiles(rowIndex) {
 
 /*
   Add a letter to the current position.
-
-  The regular expression restricts input to English alphabetic
-  characters. The game displays letters in uppercase regardless
-  of whether the physical key produces lowercase or uppercase.
 */
 function addLetter(letter) {
-  // A row can contain no more than five letters.
+  // A Wordle guess contains exactly five letters.
   if (currentTile >= 5) {
     return;
   }
@@ -77,8 +60,6 @@ function addLetter(letter) {
 
 /*
   Remove the most recently entered letter.
-
-  If the current row is empty, Backspace has nothing to remove.
 */
 function removeLetter() {
   if (currentTile <= 0) {
@@ -95,11 +76,8 @@ function removeLetter() {
 /*
   Move to the next row.
 
-  This function is included now so the game state has a clear place
-  for row advancement when guess submission is introduced.
-
-  Stage 3 does not call it because Enter/submission is intentionally
-  not implemented yet.
+  This remains unused in Stage 4 because Enter does not submit
+  guesses until validation is implemented in a later stage.
 */
 function moveToNextRow() {
   if (currentRow >= rows.length - 1) {
@@ -111,49 +89,92 @@ function moveToNextRow() {
 }
 
 /*
-  Handle physical keyboard input.
+  Handle a letter from either input source.
 
-  We listen on the document so the player does not need to focus a
-  particular element before typing.
+  Keeping this small wrapper means the physical keyboard and
+  on-screen keyboard use exactly the same letter-entry behaviour.
 */
+function handleLetter(letter) {
+  if (/^[a-zA-Z]$/.test(letter)) {
+    addLetter(letter);
+  }
+}
+
+/*
+  Handle a keyboard action from either input source.
+
+  "backspace" removes a letter.
+  "enter" is intentionally ignored until Stage 5.
+*/
+function handleAction(action) {
+  if (action === "backspace") {
+    removeLetter();
+    return;
+  }
+
+  if (action === "enter") {
+    // Submission is intentionally not implemented yet.
+  }
+}
+
+/* ------------------------------
+   Physical keyboard
+   ------------------------------ */
+
 document.addEventListener("keydown", (event) => {
   /*
-    Do not interfere with browser/system shortcuts such as:
-    - Ctrl + key
-    - Command + key
-    - Alt + key
+    Do not interfere with browser/system shortcuts.
   */
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }
 
-  /*
-    Backspace removes the previous letter.
-  */
   if (event.key === "Backspace") {
     event.preventDefault();
-    removeLetter();
+    handleAction("backspace");
     return;
   }
 
-  /*
-    Enter is intentionally ignored at this stage.
-
-    Guess submission will be added after word validation exists.
-  */
   if (event.key === "Enter") {
     event.preventDefault();
+    handleAction("enter");
     return;
   }
 
-  /*
-    Accept only single alphabetic characters.
-
-    event.key.length === 1 prevents special keys such as Shift,
-    ArrowLeft, Tab, etc. from being treated as letters.
-  */
   if (/^[a-zA-Z]$/.test(event.key)) {
     event.preventDefault();
-    addLetter(event.key);
+    handleLetter(event.key);
   }
+});
+
+/* ------------------------------
+   On-screen keyboard
+   ------------------------------ */
+
+const keyboard = document.querySelector(".keyboard");
+
+/*
+  Use event delegation rather than adding a separate listener to
+  every button. This keeps the JavaScript smaller and makes the
+  keyboard easier to maintain.
+*/
+keyboard.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+
+  if (!button) {
+    return;
+  }
+
+  const key = button.dataset.key;
+
+  if (!key) {
+    return;
+  }
+
+  if (key === "backspace" || key === "enter") {
+    handleAction(key);
+    return;
+  }
+
+  handleLetter(key);
 });
