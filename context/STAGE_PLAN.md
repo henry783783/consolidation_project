@@ -48,14 +48,19 @@ Status values:
   - Advance to the next row after a valid guess.
   - Keep letter evaluation and win/loss handling deferred.
 
-- [ ] **Stage 6 — Guess evaluation**
-  - Implement Wordle-compatible letter evaluation.
+- [x] **Stage 6 — Guess evaluation**
+  - Evaluate exact letter/position matches.
+  - Evaluate letters present in the target but in the wrong position.
+  - Mark absent letters.
   - Correctly handle duplicate letters.
-  - Display result colours/states.
+  - Apply visual states to submitted tiles.
+  - Keep win/loss handling deferred.
 
 - [ ] **Stage 7 — Win/loss flow**
-  - Detect wins and losses.
-  - Display an appropriate end-of-game message.
+  - Detect a correct target-word guess.
+  - Detect when all six guesses have been used.
+  - Display appropriate win/loss messages.
+  - Prevent further input after the game ends.
   - Add a new-game action.
 
 - [ ] **Stage 8 — Polish and accessibility**
