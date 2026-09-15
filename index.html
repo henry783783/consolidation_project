@@ -25,8 +25,8 @@
     <!--
       The board is controlled by js/game.js.
 
-      Stage 4 adds an on-screen keyboard below this board.
-      Guess submission and validation are still deferred.
+      Stage 5 allows complete five-letter guesses to be submitted.
+      Valid guesses move to the next row.
     -->
     <section
       class="board"
@@ -81,12 +81,6 @@
       </div>
     </section>
 
-    <!--
-      On-screen keyboard.
-
-      data-key values are deliberately simple because game.js uses
-      them to determine which action the player requested.
-    -->
     <section
       class="keyboard"
       aria-label="On-screen keyboard"
@@ -145,8 +139,11 @@
       </div>
     </section>
 
-    <p class="stage-status">
-      Stage 4 — On-screen keyboard ready
+    <p
+      class="stage-status"
+      aria-live="polite"
+    >
+      Stage 5 — Enter a five-letter guess
     </p>
   </main>
 
