@@ -84,6 +84,18 @@ const rows = document.querySelectorAll(".row");
 const statusMessage = document.querySelector(".stage-status");
 const newGameButton = document.querySelector("#new-game");
 
+/*
+  Establish the initial UI state immediately.
+
+  The New Game button should only be available after the
+  current game has ended. Setting this explicitly here means
+  the page starts in a known state even if the browser has
+  retained an older CSS version in its cache.
+*/
+if (newGameButton) {
+  newGameButton.hidden = true;
+}
+
 let currentRow = 0;
 let currentTile = 0;
 
