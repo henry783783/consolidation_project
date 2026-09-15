@@ -14,15 +14,17 @@ For each submitted guess, letters will eventually be evaluated as:
 - **Wrong position** — the letter is in the target word but in a different position.
 - **Not present** — the letter does not occur in the target word, subject to normal Wordle duplicate-letter rules.
 
-The game will eventually provide both an on-screen keyboard and keyboard-input support.
+The game provides both physical keyboard and on-screen keyboard input.
 
 ## Current stage
 
-Stage 2 establishes the visual guessing board.
+Stage 5 adds actual guess submission and validation.
 
-The board contains six guess rows and five letter tiles per row. It is currently non-interactive.
+The development target is currently the fixed word `CRANE`. A small self-contained list of five-letter words is used to determine whether a submitted guess is accepted.
 
-No guessing, word validation, scoring, persistence, animations, or game-state logic is implemented yet.
+A valid five-letter word advances the player to the next row. An incomplete or unrecognised word remains on the current row and displays a validation message.
+
+Letter evaluation and win/loss behaviour are deliberately deferred to later stages.
 
 ## Scope boundaries
 
