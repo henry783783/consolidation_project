@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>It works!</title>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #1a1a2e;
+    color: white;
+    font-family: system-ui, sans-serif;
+    text-align: center;
+  }
+  h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  p { opacity: 0.7; }
+  button {
+    margin-top: 2rem;
+    padding: 12px 24px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    background: #e94560;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover { background: #ff5773; }
+  #count { font-size: 1.5rem; margin-top: 1rem; }
+</style>
+</head>
+<body>
+  <h1>🎉 It's live!</h1>
+  <p>This page is being served from your GitHub repo via GitHub Pages.</p>
+  <button onclick="increment()">Click me</button>
+  <div id="count">0 clicks</div>
+
+  <script>
+    let clicks = 0;
+    function increment() {
+      clicks++;
+      document.getElementById('count').textContent = clicks + ' click' + (clicks === 1 ? '' : 's');
+    }
+  </script>
+</body>
+</html>
