@@ -1,19 +1,24 @@
-/*
+ /*
   Wordle-style game
-  Stage 5: Word validation and guess submission
+  Stage 6: Guess evaluation
 
-  IMPORTANT:
-  A Wordle guess is always exactly five letters.
-
-  This file deliberately enforces that rule in JavaScript rather than
-  relying on the number of tile elements present in the HTML. That makes
-  the game safer if the board markup is accidentally changed later.
+  This file controls:
+  - Physical keyboard input.
+  - On-screen keyboard input.
+  - Backspace.
+  - Five-letter guess validation.
+  - Guess submission.
+  - Wordle-style letter evaluation.
+  - Correct / wrong-position / not-present tile states.
+  - Movement to the next row after a valid guess.
 
   Not yet implemented:
-  - Letter colours/evaluation.
-  - Duplicate-letter evaluation.
   - Win/loss detection.
   - New game/reset functionality.
+  - Random target selection.
+
+  The target word remains fixed as CRANE during development so the
+  evaluation can be tested predictably.
 */
 
 "use strict";
@@ -28,15 +33,14 @@ const MAX_GUESSES = 6;
 /*
   Fixed development target.
 
-  Keeping this fixed makes testing predictable. Random target selection
-  will be introduced separately later.
+  This is intentionally unchanged from Stage 5.
 */
 const targetWord = "CRANE";
 
 /*
   Small development dictionary.
 
-  Only five-letter words are accepted.
+  Only five-letter words are accepted as guesses.
 */
 const allowedWords = new Set([
   "ABOUT",
@@ -302,21 +306,12 @@ const allowedWords = new Set([
 ]);
 
 /* ------------------------------
-   Page elements
+   Page elements and game state
    ------------------------------ */
 
 const rows = document.querySelectorAll(".row");
 const statusMessage = document.querySelector(".stage-status");
 
-/*
-  Game state.
-
-  currentRow:
-    The row currently being edited, starting at 0.
-
-  currentTile:
-    The number of letters currently entered into that row.
-*/
 let currentRow = 0;
 let currentTile = 0;
 
@@ -325,10 +320,7 @@ let currentTile = 0;
    ------------------------------ */
 
 /*
-  Get the tiles for the current row.
-
-  We deliberately take only the first five tiles. The game itself
-  must always operate on exactly five positions.
+  Return exactly the five tiles used by the game in the active row.
 */
 function getCurrentRowTiles() {
   if (!rows[currentRow]) {
@@ -341,10 +333,7 @@ function getCurrentRowTiles() {
 }
 
 /*
-  Read exactly the letters the player has entered.
-
-  currentTile is the authoritative count, rather than the number
-  of elements in the row.
+  Read the letters currently entered in the active row.
 */
 function getCurrentGuess() {
   const tiles = getCurrentRowTiles();
@@ -368,22 +357,16 @@ function showMessage(message) {
    Letter input
    ------------------------------ */
 
-/*
-  Add one letter.
-
-  The WORD_LENGTH check is the important protection here:
-  no input source can ever put more than five letters into a guess.
-*/
 function addLetter(letter) {
+  /*
+    A guess can never contain more than five letters.
+  */
   if (currentTile >= WORD_LENGTH) {
     return;
   }
 
   const tiles = getCurrentRowTiles();
 
-  /*
-    Safety check in case the board does not contain enough tiles.
-  */
   if (!tiles[currentTile]) {
     return;
   }
@@ -393,9 +376,6 @@ function addLetter(letter) {
   currentTile += 1;
 }
 
-/*
-  Remove the most recently entered letter.
-*/
 function removeLetter() {
   if (currentTile <= 0) {
     return;
@@ -410,13 +390,104 @@ function removeLetter() {
   }
 }
 
-/*
-  Accept only one alphabetic character.
-*/
 function handleLetter(letter) {
   if (/^[a-zA-Z]$/.test(letter)) {
     addLetter(letter);
   }
+}
+
+/* ------------------------------
+   Guess evaluation
+   ------------------------------ */
+
+/*
+  Evaluate a valid guess against the target.
+
+  Possible results for each position:
+
+  "correct"
+    The letter is correct and in the correct position.
+
+  "present"
+    The letter occurs in the target but belongs in another position.
+
+  "absent"
+    The letter does not have an unused occurrence in the target.
+
+  The evaluation uses two passes.
+
+  Pass 1:
+    Mark exact matches as "correct" and remove those target letters
+    from the pool available for matching.
+
+  Pass 2:
+    For the remaining letters, find unused occurrences elsewhere in
+    the target. This is what makes duplicate-letter behaviour work
+    correctly.
+*/
+function evaluateGuess(guess) {
+  const results = Array(WORD_LENGTH).fill("absent");
+
+  /*
+    Convert the target into an array so individual occurrences can
+    be marked as already used.
+  */
+  const remainingTargetLetters = targetWord.split("");
+
+  /* ------------------------------
+     Pass 1: exact matches
+     ------------------------------ */
+
+  for (let index = 0; index < WORD_LENGTH; index += 1) {
+    if (guess[index] === targetWord[index]) {
+      results[index] = "correct";
+
+      /*
+        Remove this exact occurrence from the pool so a duplicate
+        in the guess cannot reuse it later.
+      */
+      remainingTargetLetters[index] = null;
+    }
+  }
+
+  /* ------------------------------
+     Pass 2: wrong-position matches
+     ------------------------------ */
+
+  for (let index = 0; index < WORD_LENGTH; index += 1) {
+    /*
+      Exact matches have already been dealt with.
+    */
+    if (results[index] === "correct") {
+      continue;
+    }
+
+    const matchingIndex = remainingTargetLetters.indexOf(guess[index]);
+
+    if (matchingIndex !== -1) {
+      results[index] = "present";
+
+      /*
+        Consume the matched target occurrence.
+      */
+      remainingTargetLetters[matchingIndex] = null;
+    }
+  }
+
+  return results;
+}
+
+/*
+  Apply evaluation results to the five tiles in the submitted row.
+*/
+function displayEvaluation(results) {
+  const tiles = getCurrentRowTiles();
+
+  results.forEach((result, index) => {
+    if (tiles[index]) {
+      tiles[index].classList.add(result);
+    }
+  });
 }
 
 /* ------------------------------
@@ -425,7 +496,7 @@ function handleLetter(letter) {
 
 function submitGuess() {
   /*
-    Use currentTile as the authoritative number of letters entered.
+    The player must enter exactly five letters.
   */
   if (currentTile !== WORD_LENGTH) {
     showMessage("Not enough letters");
@@ -435,8 +506,7 @@ function submitGuess() {
   const guess = getCurrentGuess();
 
   /*
-    A second safety check ensures the actual text also contains
-    exactly five letters.
+    Safety check: the actual text must also be exactly five letters.
   */
   if (guess.length !== WORD_LENGTH) {
     showMessage("Not enough letters");
@@ -444,7 +514,7 @@ function submitGuess() {
   }
 
   /*
-    The word must exist in the allowed list.
+    Reject words that are not in the allowed dictionary.
   */
   if (!allowedWords.has(guess)) {
     showMessage("Word not in list");
@@ -452,15 +522,18 @@ function submitGuess() {
   }
 
   /*
-    The guess is valid.
-
-    Letter evaluation is intentionally deferred to Stage 6.
+    The guess is valid, so evaluate it before moving to the next row.
   */
-  showMessage("Guess accepted");
+  const results = evaluateGuess(guess);
+
+  displayEvaluation(results);
 
   /*
-    Move to the next row unless this was the final row.
+    Stage 7 will determine whether the player has won or lost.
+    For now, every valid guess simply advances to the next row.
   */
+  showMessage("Guess evaluated");
+
   if (currentRow < MAX_GUESSES - 1) {
     currentRow += 1;
     currentTile = 0;
@@ -468,7 +541,7 @@ function submitGuess() {
 }
 
 /*
-  Handle actions shared by both physical and on-screen input.
+  Handle Enter and Backspace from either input method.
 */
 function handleAction(action) {
   if (action === "backspace") {
@@ -487,7 +560,7 @@ function handleAction(action) {
 
 document.addEventListener("keydown", (event) => {
   /*
-    Do not interfere with browser shortcuts such as Ctrl+R.
+    Do not interfere with browser shortcuts.
   */
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
@@ -515,12 +588,6 @@ document.addEventListener("keydown", (event) => {
    On-screen keyboard
    ------------------------------ */
 
-/*
-  One click handler is used for the on-screen keyboard.
-
-  Looking for data-key means the handler does not depend on the
-  exact internal structure of the keyboard HTML.
-*/
 document.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-key]");
 
