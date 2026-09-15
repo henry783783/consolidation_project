@@ -1,24 +1,18 @@
- /*
+/*
   Wordle-style game
-  Stage 6: Guess evaluation
+  Stage 7: Win/loss flow
 
   This file controls:
   - Physical keyboard input.
   - On-screen keyboard input.
   - Backspace.
   - Five-letter guess validation.
-  - Guess submission.
   - Wordle-style letter evaluation.
-  - Correct / wrong-position / not-present tile states.
-  - Movement to the next row after a valid guess.
-
-  Not yet implemented:
   - Win/loss detection.
-  - New game/reset functionality.
-  - Random target selection.
+  - New-game/reset behaviour.
 
-  The target word remains fixed as CRANE during development so the
-  evaluation can be tested predictably.
+  The target remains fixed as CRANE during development.
+  Random target selection will be introduced separately later.
 */
 
 "use strict";
@@ -29,279 +23,56 @@
 
 const WORD_LENGTH = 5;
 const MAX_GUESSES = 6;
-
-/*
-  Fixed development target.
-
-  This is intentionally unchanged from Stage 5.
-*/
 const targetWord = "CRANE";
 
 /*
   Small development dictionary.
-
   Only five-letter words are accepted as guesses.
 */
 const allowedWords = new Set([
-  "ABOUT",
-  "ABOVE",
-  "AFTER",
-  "AGAIN",
-  "ALONE",
-  "APPLE",
-  "BEACH",
-  "BEGIN",
-  "BLACK",
-  "BLAME",
-  "BLIND",
-  "BLOCK",
-  "BRAIN",
-  "BRAVE",
-  "BREAD",
-  "BREAK",
-  "BRING",
-  "BROWN",
-  "BUILD",
-  "CARRY",
-  "CAUSE",
-  "CHAIN",
-  "CHAIR",
-  "CHART",
-  "CHASE",
-  "CHEAP",
-  "CHECK",
-  "CHEST",
-  "CHILD",
-  "CLEAN",
-  "CLEAR",
-  "CLIMB",
-  "CLOCK",
-  "CLOSE",
-  "CLOUD",
-  "COACH",
-  "COAST",
-  "COLOR",
-  "COUNT",
-  "COURT",
-  "COVER",
-  "CRANE",
-  "CRAZY",
-  "CREAM",
-  "CROSS",
-  "CROWD",
-  "CROWN",
-  "DANCE",
-  "DEATH",
-  "DEPTH",
-  "DOUBT",
-  "DOZEN",
-  "DREAM",
-  "DRINK",
-  "DRIVE",
-  "EARTH",
-  "EMPTY",
-  "ENJOY",
-  "ENTER",
-  "EQUAL",
-  "ERROR",
-  "EVENT",
-  "EVERY",
-  "FAITH",
-  "FALSE",
-  "FIELD",
-  "FIGHT",
-  "FINAL",
-  "FIRST",
-  "FLOOR",
-  "FOCUS",
-  "FORCE",
-  "FOUND",
-  "FRAME",
-  "FRONT",
-  "FRUIT",
-  "FUNNY",
-  "GIANT",
-  "GIVEN",
-  "GLASS",
-  "GOING",
-  "GRANT",
-  "GRASS",
-  "GREAT",
-  "GREEN",
-  "GROUP",
-  "GUESS",
-  "HAPPY",
-  "HEART",
-  "HEAVY",
-  "HOUSE",
-  "HUMAN",
-  "IDEAL",
-  "IMAGE",
-  "INDEX",
-  "INNER",
-  "ISSUE",
-  "JOINT",
-  "JUDGE",
-  "KNOWN",
-  "LARGE",
-  "LEARN",
-  "LEAST",
-  "LEAVE",
-  "LIGHT",
-  "LIMIT",
-  "LOCAL",
-  "LOGIC",
-  "LUCKY",
-  "MAGIC",
-  "MAJOR",
-  "MATCH",
-  "MAYBE",
-  "METAL",
-  "MIGHT",
-  "MINOR",
-  "MONEY",
-  "MONTH",
-  "MOUSE",
-  "MOUTH",
-  "MOVIE",
-  "MUSIC",
-  "NEVER",
-  "NIGHT",
-  "NORTH",
-  "NOVEL",
-  "OCEAN",
-  "OFFER",
-  "ORDER",
-  "OTHER",
-  "PAINT",
-  "PAPER",
-  "PARTY",
-  "PEACE",
-  "PHONE",
-  "PIECE",
-  "PILOT",
-  "PLACE",
-  "PLAIN",
-  "PLANE",
-  "PLANT",
-  "POINT",
-  "POWER",
-  "PRESS",
-  "PRICE",
-  "PRIDE",
-  "PRIME",
-  "PRINT",
-  "PRIOR",
-  "PROUD",
-  "PROVE",
-  "QUEEN",
-  "QUICK",
-  "QUIET",
-  "RADIO",
-  "RAISE",
-  "RANGE",
-  "REACH",
-  "READY",
-  "RIGHT",
-  "RIVER",
-  "ROUND",
-  "ROYAL",
-  "SCALE",
-  "SCENE",
-  "SCORE",
-  "SENSE",
-  "SERVE",
-  "SEVEN",
-  "SHARE",
-  "SHARP",
-  "SHEEP",
-  "SHEET",
-  "SHIFT",
-  "SHINE",
-  "SHORT",
-  "SHOUT",
-  "SIGHT",
-  "SINCE",
-  "SIXTH",
-  "SMALL",
-  "SMART",
-  "SMILE",
-  "SOUTH",
-  "SPACE",
-  "SPEAK",
-  "SPEED",
-  "SPEND",
-  "SPINE",
-  "SPLIT",
-  "SPORT",
-  "STAGE",
-  "STAIR",
-  "STAND",
-  "START",
-  "STATE",
-  "STEAM",
-  "STEEL",
-  "STICK",
-  "STILL",
-  "STOCK",
-  "STONE",
-  "STORE",
-  "STORM",
-  "STORY",
-  "SUGAR",
-  "TABLE",
-  "TEACH",
-  "THANK",
-  "THEIR",
-  "THERE",
-  "THESE",
-  "THING",
-  "THINK",
-  "THIRD",
-  "THOSE",
-  "THREE",
-  "THROW",
-  "TIGHT",
-  "TIMES",
-  "TITLE",
-  "TODAY",
-  "TOTAL",
-  "TOUCH",
-  "TOWER",
-  "TRACK",
-  "TRADE",
-  "TRAIN",
-  "TREAT",
-  "TRIAL",
-  "TRUST",
-  "TRUTH",
-  "UNCLE",
-  "UNDER",
-  "UNION",
-  "UNTIL",
-  "UPPER",
-  "USUAL",
-  "VALUE",
-  "VIDEO",
-  "VISIT",
-  "VOICE",
-  "WASTE",
-  "WATCH",
-  "WATER",
-  "WHEEL",
-  "WHERE",
-  "WHILE",
-  "WHITE",
-  "WHOLE",
-  "WHOSE",
-  "WOMAN",
-  "WORLD",
-  "WORRY",
-  "WORTH",
-  "WOULD",
-  "WRITE",
-  "WRONG",
-  "YOUNG",
+  "ABOUT", "ABOVE", "AFTER", "AGAIN", "ALONE", "APPLE",
+  "BEACH", "BEGIN", "BLACK", "BLAME", "BLIND", "BLOCK",
+  "BRAIN", "BRAVE", "BREAD", "BREAK", "BRING", "BROWN",
+  "BUILD", "CARRY", "CAUSE", "CHAIN", "CHAIR", "CHART",
+  "CHASE", "CHEAP", "CHECK", "CHEST", "CHILD", "CLEAN",
+  "CLEAR", "CLIMB", "CLOCK", "CLOSE", "CLOUD", "COACH",
+  "COAST", "COLOR", "COUNT", "COURT", "COVER", "CRANE",
+  "CRAZY", "CREAM", "CROSS", "CROWD", "CROWN", "DANCE",
+  "DEATH", "DEPTH", "DOUBT", "DOZEN", "DREAM", "DRINK",
+  "DRIVE", "EARTH", "EMPTY", "ENJOY", "ENTER", "EQUAL",
+  "ERROR", "EVENT", "EVERY", "FAITH", "FALSE", "FIELD",
+  "FIGHT", "FINAL", "FIRST", "FLOOR", "FOCUS", "FORCE",
+  "FOUND", "FRAME", "FRONT", "FRUIT", "FUNNY", "GIANT",
+  "GIVEN", "GLASS", "GOING", "GRANT", "GRASS", "GREAT",
+  "GREEN", "GROUP", "GUESS", "HAPPY", "HEART", "HEAVY",
+  "HOUSE", "HUMAN", "IDEAL", "IMAGE", "INDEX", "INNER",
+  "ISSUE", "JOINT", "JUDGE", "KNOWN", "LARGE", "LEARN",
+  "LEAST", "LEAVE", "LIGHT", "LIMIT", "LOCAL", "LOGIC",
+  "LUCKY", "MAGIC", "MAJOR", "MATCH", "MAYBE", "METAL",
+  "MIGHT", "MINOR", "MONEY", "MONTH", "MOUSE", "MOUTH",
+  "MOVIE", "MUSIC", "NEVER", "NIGHT", "NORTH", "NOVEL",
+  "OCEAN", "OFFER", "ORDER", "OTHER", "PAINT", "PAPER",
+  "PARTY", "PEACE", "PHONE", "PIECE", "PILOT", "PLACE",
+  "PLAIN", "PLANE", "PLANT", "POINT", "POWER", "PRESS",
+  "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR", "PROUD",
+  "QUEEN", "QUICK", "QUIET", "RADIO", "RAISE", "RANGE",
+  "REACH", "READY", "RIGHT", "RIVER", "ROUND", "ROYAL",
+  "SCALE", "SCENE", "SCORE", "SENSE", "SERVE", "SEVEN",
+  "SHARE", "SHARP", "SHEEP", "SHEET", "SHIFT", "SHINE",
+  "SHORT", "SHOUT", "SIGHT", "SINCE", "SIXTH", "SMALL",
+  "SMART", "SMILE", "SOUTH", "SPACE", "SPEAK", "SPEED",
+  "SPEND", "SPINE", "SPLIT", "SPORT", "STAGE", "STAIR",
+  "STAND", "START", "STATE", "STEAM", "STEEL", "STICK",
+  "STILL", "STOCK", "STONE", "STORE", "STORM", "STORY",
+  "SUGAR", "TABLE", "TEACH", "THANK", "THEIR", "THERE",
+  "THESE", "THING", "THINK", "THIRD", "THOSE", "THREE",
+  "THROW", "TIGHT", "TIMES", "TITLE", "TODAY", "TOTAL",
+  "TOUCH", "TOWER", "TRACK", "TRADE", "TRAIN", "TREAT",
+  "TRIAL", "TRUST", "TRUTH", "UNCLE", "UNDER", "UNION",
+  "UNTIL", "UPPER", "USUAL", "VALUE", "VIDEO", "VISIT",
+  "VOICE", "WASTE", "WATCH", "WATER", "WHEEL", "WHERE",
+  "WHILE", "WHITE", "WHOLE", "WHOSE", "WOMAN", "WORLD",
+  "WORRY", "WORTH", "WOULD", "WRITE", "WRONG", "YOUNG",
   "YOUTH"
 ]);
 
@@ -311,17 +82,22 @@ const allowedWords = new Set([
 
 const rows = document.querySelectorAll(".row");
 const statusMessage = document.querySelector(".stage-status");
+const newGameButton = document.querySelector("#new-game");
 
 let currentRow = 0;
 let currentTile = 0;
+
+/*
+  True once the player has either won or lost.
+
+  All letter and action input is ignored while the game is over.
+*/
+let gameOver = false;
 
 /* ------------------------------
    Board helpers
    ------------------------------ */
 
-/*
-  Return exactly the five tiles used by the game in the active row.
-*/
 function getCurrentRowTiles() {
   if (!rows[currentRow]) {
     return [];
@@ -332,9 +108,6 @@ function getCurrentRowTiles() {
   ).slice(0, WORD_LENGTH);
 }
 
-/*
-  Read the letters currently entered in the active row.
-*/
 function getCurrentGuess() {
   const tiles = getCurrentRowTiles();
 
@@ -344,9 +117,6 @@ function getCurrentGuess() {
     .join("");
 }
 
-/*
-  Display a message beneath the keyboard.
-*/
 function showMessage(message) {
   if (statusMessage) {
     statusMessage.textContent = message;
@@ -358,10 +128,7 @@ function showMessage(message) {
    ------------------------------ */
 
 function addLetter(letter) {
-  /*
-    A guess can never contain more than five letters.
-  */
-  if (currentTile >= WORD_LENGTH) {
+  if (gameOver || currentTile >= WORD_LENGTH) {
     return;
   }
 
@@ -372,12 +139,11 @@ function addLetter(letter) {
   }
 
   tiles[currentTile].textContent = letter.toUpperCase();
-
   currentTile += 1;
 }
 
 function removeLetter() {
-  if (currentTile <= 0) {
+  if (gameOver || currentTile <= 0) {
     return;
   }
 
@@ -400,64 +166,26 @@ function handleLetter(letter) {
    Guess evaluation
    ------------------------------ */
 
-/*
-  Evaluate a valid guess against the target.
-
-  Possible results for each position:
-
-  "correct"
-    The letter is correct and in the correct position.
-
-  "present"
-    The letter occurs in the target but belongs in another position.
-
-  "absent"
-    The letter does not have an unused occurrence in the target.
-
-  The evaluation uses two passes.
-
-  Pass 1:
-    Mark exact matches as "correct" and remove those target letters
-    from the pool available for matching.
-
-  Pass 2:
-    For the remaining letters, find unused occurrences elsewhere in
-    the target. This is what makes duplicate-letter behaviour work
-    correctly.
-*/
 function evaluateGuess(guess) {
   const results = Array(WORD_LENGTH).fill("absent");
-
-  /*
-    Convert the target into an array so individual occurrences can
-    be marked as already used.
-  */
   const remainingTargetLetters = targetWord.split("");
 
-  /* ------------------------------
-     Pass 1: exact matches
-     ------------------------------ */
-
+  /*
+    First pass:
+    exact matches are marked correct and consumed.
+  */
   for (let index = 0; index < WORD_LENGTH; index += 1) {
     if (guess[index] === targetWord[index]) {
       results[index] = "correct";
-
-      /*
-        Remove this exact occurrence from the pool so a duplicate
-        in the guess cannot reuse it later.
-      */
       remainingTargetLetters[index] = null;
     }
   }
 
-  /* ------------------------------
-     Pass 2: wrong-position matches
-     ------------------------------ */
-
+  /*
+    Second pass:
+    remaining letters are checked for wrong-position matches.
+  */
   for (let index = 0; index < WORD_LENGTH; index += 1) {
-    /*
-      Exact matches have already been dealt with.
-    */
     if (results[index] === "correct") {
       continue;
     }
@@ -466,10 +194,6 @@ function evaluateGuess(guess) {
 
     if (matchingIndex !== -1) {
       results[index] = "present";
-
-      /*
-        Consume the matched target occurrence.
-      */
       remainingTargetLetters[matchingIndex] = null;
     }
   }
@@ -477,11 +201,10 @@ function evaluateGuess(guess) {
   return results;
 }
 
-/*
-  Apply evaluation results to the five tiles in the submitted row.
-*/
-function displayEvaluation(results) {
-  const tiles = getCurrentRowTiles();
+function displayEvaluation(results, rowIndex) {
+  const tiles = Array.from(
+    rows[rowIndex].querySelectorAll(".tile")
+  ).slice(0, WORD_LENGTH);
 
   results.forEach((result, index) => {
     if (tiles[index]) {
@@ -491,13 +214,38 @@ function displayEvaluation(results) {
 }
 
 /* ------------------------------
+   Win/loss handling
+   ------------------------------ */
+
+function endGame(won) {
+  gameOver = true;
+
+  if (won) {
+    showMessage("You win!");
+  } else {
+    showMessage(`Game over — the word was ${targetWord}.`);
+  }
+
+  /*
+    Make the New Game button available once the current game ends.
+  */
+  if (newGameButton) {
+    newGameButton.hidden = false;
+  }
+}
+
+/* ------------------------------
    Guess submission
    ------------------------------ */
 
 function submitGuess() {
   /*
-    The player must enter exactly five letters.
+    Nothing can be submitted after the game ends.
   */
+  if (gameOver) {
+    return;
+  }
+
   if (currentTile !== WORD_LENGTH) {
     showMessage("Not enough letters");
     return;
@@ -505,44 +253,76 @@ function submitGuess() {
 
   const guess = getCurrentGuess();
 
-  /*
-    Safety check: the actual text must also be exactly five letters.
-  */
   if (guess.length !== WORD_LENGTH) {
     showMessage("Not enough letters");
     return;
   }
 
-  /*
-    Reject words that are not in the allowed dictionary.
-  */
   if (!allowedWords.has(guess)) {
     showMessage("Word not in list");
     return;
   }
 
-  /*
-    The guess is valid, so evaluate it before moving to the next row.
-  */
   const results = evaluateGuess(guess);
-
-  displayEvaluation(results);
+  displayEvaluation(results, currentRow);
 
   /*
-    Stage 7 will determine whether the player has won or lost.
-    For now, every valid guess simply advances to the next row.
+    A correct target guess immediately ends the game.
   */
+  if (guess === targetWord) {
+    endGame(true);
+    return;
+  }
+
+  /*
+    This was an incorrect but valid guess.
+
+    currentRow is zero-based, so the sixth completed row has
+    index MAX_GUESSES - 1.
+  */
+  if (currentRow === MAX_GUESSES - 1) {
+    endGame(false);
+    return;
+  }
+
   showMessage("Guess evaluated");
 
-  if (currentRow < MAX_GUESSES - 1) {
-    currentRow += 1;
-    currentTile = 0;
+  currentRow += 1;
+  currentTile = 0;
+}
+
+/* ------------------------------
+   New game
+   ------------------------------ */
+
+function startNewGame() {
+  /*
+    Clear every tile and every evaluation class.
+  */
+  rows.forEach((row) => {
+    const tiles = row.querySelectorAll(".tile");
+
+    tiles.forEach((tile) => {
+      tile.textContent = "";
+      tile.classList.remove("correct", "present", "absent");
+    });
+  });
+
+  currentRow = 0;
+  currentTile = 0;
+  gameOver = false;
+
+  showMessage("Stage 7: Win/loss flow");
+
+  if (newGameButton) {
+    newGameButton.hidden = true;
   }
 }
 
-/*
-  Handle Enter and Backspace from either input method.
-*/
+/* ------------------------------
+   Shared actions
+   ------------------------------ */
+
 function handleAction(action) {
   if (action === "backspace") {
     removeLetter();
@@ -559,9 +339,6 @@ function handleAction(action) {
    ------------------------------ */
 
 document.addEventListener("keydown", (event) => {
-  /*
-    Do not interfere with browser shortcuts.
-  */
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }
@@ -604,3 +381,11 @@ document.addEventListener("click", (event) => {
 
   handleLetter(key);
 });
+
+/* ------------------------------
+   New Game button
+   ------------------------------ */
+
+if (newGameButton) {
+  newGameButton.addEventListener("click", startNewGame);
+}
