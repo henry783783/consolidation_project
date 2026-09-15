@@ -56,12 +56,12 @@ Status values:
   - Apply visual states to submitted tiles.
   - Keep win/loss handling deferred.
 
-- [ ] **Stage 7 — Win/loss flow**
+- [x] **Stage 7 — Win/loss flow**
   - Detect a correct target-word guess.
   - Detect when all six guesses have been used.
   - Display appropriate win/loss messages.
   - Prevent further input after the game ends.
-  - Add a new-game action.
+  - Add a New Game action.
 
 - [ ] **Stage 8 — Polish and accessibility**
   - Improve mobile presentation.
