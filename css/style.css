@@ -199,8 +199,15 @@ button {
   text-align: center;
 }
 
+/*
+  The New Game button is hidden by default using the HTML
+  `hidden` attribute.
+
+  The [hidden] rule is important because an ordinary
+  `display: block` rule would otherwise override the
+  browser's default handling of the hidden attribute.
+*/
 #new-game {
-  display: block;
   margin: 0 auto;
   padding: 10px 18px;
 
@@ -212,6 +219,14 @@ button {
 
   font-weight: 700;
   cursor: pointer;
+}
+
+#new-game[hidden] {
+  display: none;
+}
+
+#new-game:not([hidden]) {
+  display: block;
 }
 
 #new-game:hover {
