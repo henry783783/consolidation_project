@@ -39,12 +39,14 @@ Status values:
   - Connect it to the same input functions used by the physical keyboard.
   - Keep Enter non-submitting until validation exists.
 
-- [ ] **Stage 5 — Word validation**
+- [x] **Stage 5 — Word validation**
   - Add the target word.
-  - Add an allowed-word list or documented validation strategy.
+  - Add a self-contained allowed-word list.
   - Implement Enter-based guess submission.
-  - Prevent invalid submissions.
+  - Reject incomplete guesses.
+  - Reject words outside the allowed list.
   - Advance to the next row after a valid guess.
+  - Keep letter evaluation and win/loss handling deferred.
 
 - [ ] **Stage 6 — Guess evaluation**
   - Implement Wordle-compatible letter evaluation.
