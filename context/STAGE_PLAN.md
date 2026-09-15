@@ -34,14 +34,17 @@ Status values:
   - Add backspace handling.
   - Keep submission and validation deferred.
 
-- [ ] **Stage 4 — On-screen keyboard**
+- [x] **Stage 4 — On-screen keyboard**
   - Add an interactive on-screen keyboard.
   - Connect it to the same input functions used by the physical keyboard.
+  - Keep Enter non-submitting until validation exists.
 
 - [ ] **Stage 5 — Word validation**
   - Add the target word.
   - Add an allowed-word list or documented validation strategy.
+  - Implement Enter-based guess submission.
   - Prevent invalid submissions.
+  - Advance to the next row after a valid guess.
 
 - [ ] **Stage 6 — Guess evaluation**
   - Implement Wordle-compatible letter evaluation.
