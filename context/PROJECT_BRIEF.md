@@ -14,23 +14,21 @@ For each submitted guess, letters are evaluated as:
 - **Wrong position** — the letter is in the target word but in a different position.
 - **Not present** — the letter does not have an unused occurrence in the target.
 
-Duplicate letters must follow normal Wordle-style matching rules.
+Duplicate letters follow normal Wordle-style matching rules.
 
 The game provides both physical keyboard and on-screen keyboard input.
 
 ## Current stage
 
-Stage 6 adds Wordle-style guess evaluation.
+Stage 7 implements the end-of-game flow.
 
-The development target remains the fixed word `CRANE`. Valid guesses are evaluated after submission and their five tiles receive visual states for:
+The development target remains the fixed word `CRANE`.
 
-- `correct`
-- `present`
-- `absent`
+A correct guess immediately ends the game with a win message. If the player submits six valid incorrect guesses, the game ends with a loss message and the target word is revealed in that end-of-game message.
 
-The evaluation uses a two-pass algorithm so duplicate letters are not incorrectly counted.
+Once the game ends, further keyboard and on-screen keyboard input is ignored.
 
-Win/loss handling is deliberately deferred to Stage 7.
+A New Game button resets the board and starts another game using the same fixed development target.
 
 ## Scope boundaries
 
