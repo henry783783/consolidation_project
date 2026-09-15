@@ -1,0 +1,14 @@
+# Architecture
+
+## Current repository structure
+
+```text
+/
+├── context/
+│   ├── ARCHITECTURE.md
+│   ├── DECISIONS.md
+│   ├── GUARDRAILS.md
+│   ├── PROJECT_BRIEF.md
+│   ├── PROMPT_LOG.md
+│   └── STAGE_PLAN.md
+└── index.html
