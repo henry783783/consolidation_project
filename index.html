@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
 
-  <!--
-    Ensures the layout uses the device's actual width on mobile.
-  -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
   <title>Wordle-Style Game</title>
 
@@ -25,12 +25,8 @@
     <!--
       The board is controlled by js/game.js.
 
-      Each row represents one possible guess.
-      Each tile represents one letter.
-
-      Stage 3 allows letters to be entered into the first row.
-      Guess submission and moving between rows are intentionally
-      deferred until later stages.
+      Stage 4 adds an on-screen keyboard below this board.
+      Guess submission and validation are still deferred.
     -->
     <section
       class="board"
@@ -85,15 +81,75 @@
       </div>
     </section>
 
+    <!--
+      On-screen keyboard.
+
+      data-key values are deliberately simple because game.js uses
+      them to determine which action the player requested.
+    -->
+    <section
+      class="keyboard"
+      aria-label="On-screen keyboard"
+    >
+      <div class="keyboard-row">
+        <button type="button" data-key="q" aria-label="Q">Q</button>
+        <button type="button" data-key="w" aria-label="W">W</button>
+        <button type="button" data-key="e" aria-label="E">E</button>
+        <button type="button" data-key="r" aria-label="R">R</button>
+        <button type="button" data-key="t" aria-label="T">T</button>
+        <button type="button" data-key="y" aria-label="Y">Y</button>
+        <button type="button" data-key="u" aria-label="U">U</button>
+        <button type="button" data-key="i" aria-label="I">I</button>
+        <button type="button" data-key="o" aria-label="O">O</button>
+        <button type="button" data-key="p" aria-label="P">P</button>
+      </div>
+
+      <div class="keyboard-row keyboard-row-middle">
+        <button type="button" data-key="a" aria-label="A">A</button>
+        <button type="button" data-key="s" aria-label="S">S</button>
+        <button type="button" data-key="d" aria-label="D">D</button>
+        <button type="button" data-key="f" aria-label="F">F</button>
+        <button type="button" data-key="g" aria-label="G">G</button>
+        <button type="button" data-key="h" aria-label="H">H</button>
+        <button type="button" data-key="j" aria-label="J">J</button>
+        <button type="button" data-key="k" aria-label="K">K</button>
+        <button type="button" data-key="l" aria-label="L">L</button>
+      </div>
+
+      <div class="keyboard-row">
+        <button
+          type="button"
+          class="keyboard-wide"
+          data-key="enter"
+          aria-label="Enter"
+        >
+          Enter
+        </button>
+
+        <button type="button" data-key="z" aria-label="Z">Z</button>
+        <button type="button" data-key="x" aria-label="X">X</button>
+        <button type="button" data-key="c" aria-label="C">C</button>
+        <button type="button" data-key="v" aria-label="V">V</button>
+        <button type="button" data-key="b" aria-label="B">B</button>
+        <button type="button" data-key="n" aria-label="N">N</button>
+        <button type="button" data-key="m" aria-label="M">M</button>
+
+        <button
+          type="button"
+          class="keyboard-wide"
+          data-key="backspace"
+          aria-label="Backspace"
+        >
+          ←
+        </button>
+      </div>
+    </section>
+
     <p class="stage-status">
-      Stage 3 — Keyboard input ready
+      Stage 4 — On-screen keyboard ready
     </p>
   </main>
 
-  <!--
-    JavaScript is loaded at the end of the body so that all board
-    elements already exist when game.js searches for them.
-  -->
   <script src="js/game.js"></script>
 </body>
 </html>
