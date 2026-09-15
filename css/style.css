@@ -1,23 +1,33 @@
 /*
   Wordle-style game
-  Stage 4: Board and on-screen keyboard
+  Stage 6: Board, keyboard, and evaluation colours
 
   Presentation only. Game behaviour is handled by js/game.js.
 */
-
-/* ------------------------------
-   Base page styles
-   ------------------------------ */
 
 :root {
   --page-background: #ffffff;
   --text-color: #212121;
   --secondary-text: #666666;
   --tile-border: #d3d6da;
+
   --keyboard-background: #d3d6da;
   --keyboard-text: #212121;
+
   --status-background: #f3f3f3;
   --status-text: #555555;
+
+  /*
+    Wordle-style evaluation colours.
+  */
+  --correct-background: #6aaa64;
+  --correct-text: #ffffff;
+
+  --present-background: #c9b458;
+  --present-text: #ffffff;
+
+  --absent-background: #787c7e;
+  --absent-text: #ffffff;
 
   --tile-size: 62px;
 
@@ -118,6 +128,41 @@ button {
   font-size: 2rem;
   font-weight: 700;
   text-transform: uppercase;
+
+  /*
+    Keep evaluation changes visually clear.
+  */
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+/*
+  Correct letter and position.
+*/
+.tile.correct {
+  border-color: var(--correct-background);
+  background: var(--correct-background);
+  color: var(--correct-text);
+}
+
+/*
+  Correct letter, wrong position.
+*/
+.tile.present {
+  border-color: var(--present-background);
+  background: var(--present-background);
+  color: var(--present-text);
+}
+
+/*
+  Letter is not available in the target.
+*/
+.tile.absent {
+  border-color: var(--absent-background);
+  background: var(--absent-background);
+  color: var(--absent-text);
 }
 
 /* ------------------------------
@@ -153,16 +198,7 @@ button {
   font-weight: 700;
 
   cursor: pointer;
-
-  /*
-    Prevents the browser from showing an awkward text-selection
-    behaviour when the player taps a key repeatedly.
-  */
   user-select: none;
-
-  /*
-    Gives keyboard buttons a predictable touch target.
-  */
   touch-action: manipulation;
 }
 
