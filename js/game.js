@@ -2,26 +2,19 @@
   Wordle-style game
   Stage 5: Word validation and guess submission
 
-  Responsibilities in this stage:
-  - Track the active row and tile.
-  - Accept physical A-Z keyboard input.
-  - Accept on-screen keyboard input.
-  - Handle Backspace.
-  - Validate five-letter guesses.
-  - Submit valid guesses with Enter.
-  - Move to the next row after a valid guess.
-  - Reject guesses that are too short or not in the allowed word list.
+  This file controls:
+  - Physical keyboard input.
+  - On-screen keyboard input.
+  - Backspace.
+  - Five-letter guess validation.
+  - Guess submission with Enter.
+  - Movement to the next row after a valid guess.
 
-  Deliberately NOT implemented yet:
-  - Letter colouring/evaluation.
-  - Correct/wrong-position/not-present states.
+  Not yet implemented:
+  - Letter colours/evaluation.
+  - Duplicate-letter evaluation.
   - Win/loss detection.
-  - On-screen keyboard colour states.
-  - New-game functionality.
-
-  The target word and allowed words are intentionally kept in this file
-  at this stage. This avoids introducing another file while the game's
-  basic submission flow is being tested.
+  - New game/reset functionality.
 */
 
 "use strict";
@@ -31,23 +24,18 @@
    ------------------------------ */
 
 /*
-  The target word is deliberately fixed during development.
+  The target is fixed during development so that testing is predictable.
 
-  This makes Stage 5 deterministic and easy to test. Random target
-  selection can be introduced later without changing the validation
-  rules.
+  This will eventually be replaced by a proper random target selection
+  system in a later stage.
 */
 const targetWord = "CRANE";
 
 /*
-  Self-contained list of words accepted as guesses.
+  Small development dictionary.
 
-  All entries are exactly five letters and uppercase so comparison is
-  straightforward.
-
-  This is intentionally a small development dictionary for Stage 5.
-  A larger word list can be introduced as a separate, reviewed change
-  once the complete game flow has been proven.
+  Only five-letter entries are accepted by the game. Keeping the list
+  here avoids introducing another file at this stage.
 */
 const allowedWords = new Set([
   "ABOUT",
@@ -176,7 +164,6 @@ const allowedWords = new Set([
   "NIGHT",
   "NORTH",
   "NOVEL",
-  "OCCUR",
   "OCEAN",
   "OFFER",
   "ORDER",
@@ -256,9 +243,6 @@ const allowedWords = new Set([
   "STORE",
   "STORM",
   "STORY",
-  "STRONG",
-  "STUDY",
-  "STYLE",
   "SUGAR",
   "TABLE",
   "TEACH",
@@ -276,7 +260,6 @@ const allowedWords = new Set([
   "TIMES",
   "TITLE",
   "TODAY",
-  "TOGETHER",
   "TOTAL",
   "TOUCH",
   "TOWER",
@@ -317,19 +300,8 @@ const allowedWords = new Set([
   "YOUTH"
 ]);
 
-/*
-  Some entries above are longer than five letters.
-
-  Filter them out when constructing the actual validation set.
-  This also demonstrates that the validation rule itself, rather than
-  the data source, is responsible for enforcing the five-letter rule.
-*/
-const validWords = new Set(
-  [...allowedWords].filter((word) => word.length === 5)
-);
-
 /* ------------------------------
-   Game state
+   Page elements and game state
    ------------------------------ */
 
 const rows = document.querySelectorAll(".row");
@@ -339,28 +311,25 @@ let currentRow = 0;
 let currentTile = 0;
 
 /*
-  Return all tiles belonging to a particular row.
+  Return the five tiles belonging to a row.
 */
 function getTiles(rowIndex) {
   return rows[rowIndex].querySelectorAll(".tile");
 }
 
 /*
-  Read the current row as a complete word.
+  Read all five tiles in the active row as one string.
 */
 function getCurrentGuess() {
   const tiles = getTiles(currentRow);
 
-  return [...tiles]
+  return Array.from(tiles)
     .map((tile) => tile.textContent)
     .join("");
 }
 
 /*
-  Display a short status message to the player.
-
-  This reuses the existing status element rather than adding another
-  HTML element solely for validation messages.
+  Update the message below the keyboard.
 */
 function showMessage(message) {
   statusMessage.textContent = message;
@@ -371,6 +340,9 @@ function showMessage(message) {
    ------------------------------ */
 
 function addLetter(letter) {
+  /*
+    Never allow more than five letters in a row.
+  */
   if (currentTile >= 5) {
     return;
   }
@@ -401,28 +373,32 @@ function handleLetter(letter) {
 }
 
 /* ------------------------------
-   Guess validation and submission
+   Guess submission
    ------------------------------ */
 
 /*
-  Submit the current row.
+  Validate and submit the current guess.
 
-  A submission must:
-  1. Contain exactly five letters.
-  2. Exist in the allowed word set.
-
-  If either condition fails, the player stays on the same row so the
-  guess can be corrected.
+  The order is important:
+  1. Check that exactly five letters have been entered.
+  2. Check that the word exists in the allowed list.
+  3. Only then advance to the next row.
 */
 function submitGuess() {
   const guess = getCurrentGuess();
 
-  if (guess.length < 5) {
+  /*
+    Test 1: incomplete guess.
+  */
+  if (guess.length !== 5) {
     showMessage("Not enough letters");
     return;
   }
 
-  if (!validWords.has(guess)) {
+  /*
+    Test 2: word is not recognised.
+  */
+  if (!allowedWords.has(guess)) {
     showMessage("Word not in list");
     return;
   }
@@ -430,33 +406,22 @@ function submitGuess() {
   /*
     The guess is valid.
 
-    Stage 5 does not evaluate the letters yet, so the row is simply
-    accepted and the next row becomes active.
+    We deliberately do not compare it with targetWord yet.
+    Target-word evaluation belongs to the later evaluation stages.
   */
   showMessage("Guess accepted");
 
-  moveToNextRow();
-}
-
-/*
-  Move to the next row after a valid guess.
-
-  Once the sixth row has been submitted, we keep the state on the
-  final row. Win/loss handling belongs to Stage 7.
-*/
-function moveToNextRow() {
-  if (currentRow >= rows.length - 1) {
-    currentTile = 5;
-    showMessage("All guesses used");
-    return;
+  /*
+    If this is not the final row, activate the next row.
+  */
+  if (currentRow < rows.length - 1) {
+    currentRow += 1;
+    currentTile = 0;
   }
-
-  currentRow += 1;
-  currentTile = 0;
 }
 
 /*
-  Handle an action shared by both input methods.
+  Handle Enter and Backspace from either input method.
 */
 function handleAction(action) {
   if (action === "backspace") {
@@ -475,7 +440,7 @@ function handleAction(action) {
 
 document.addEventListener("keydown", (event) => {
   /*
-    Do not interfere with browser/system shortcuts.
+    Leave browser shortcuts such as Ctrl+R alone.
   */
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
@@ -503,21 +468,38 @@ document.addEventListener("keydown", (event) => {
    On-screen keyboard
    ------------------------------ */
 
-const keyboardButtons = document.querySelectorAll(".keyboard button");
+/*
+  Handle clicks anywhere on the document.
 
-keyboardButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const key = button.dataset.key;
+  We look for the nearest button carrying a data-key attribute.
+  This means the handler continues to work even if the keyboard's
+  internal HTML structure changes later.
 
-    if (!key) {
-      return;
-    }
+  It also avoids depending on the keyboard buttons being selected
+  during initial page setup.
+*/
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-key]");
 
-    if (key === "backspace" || key === "enter") {
-      handleAction(key);
-      return;
-    }
+  /*
+    The click was not on one of our game buttons.
+  */
+  if (!button) {
+    return;
+  }
 
-    handleLetter(key);
-  });
+  const key = button.dataset.key;
+
+  /*
+    Enter and Backspace are actions rather than letters.
+  */
+  if (key === "enter" || key === "backspace") {
+    handleAction(key);
+    return;
+  }
+
+  /*
+    Otherwise the button represents a letter.
+  */
+  handleLetter(key);
 });
