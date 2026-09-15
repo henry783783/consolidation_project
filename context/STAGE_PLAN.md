@@ -27,15 +27,16 @@ Status values:
   - Add responsive styling.
   - Keep the board non-interactive.
 
-- [ ] **Stage 3 — Keyboard input and game state**
+- [x] **Stage 3 — Keyboard input and game state**
   - Add JavaScript game state.
   - Accept physical keyboard input.
   - Render typed letters into the active row.
   - Add backspace handling.
+  - Keep submission and validation deferred.
 
 - [ ] **Stage 4 — On-screen keyboard**
   - Add an interactive on-screen keyboard.
-  - Connect it to the same input logic used by the physical keyboard.
+  - Connect it to the same input functions used by the physical keyboard.
 
 - [ ] **Stage 5 — Word validation**
   - Add the target word.
@@ -67,4 +68,10 @@ Status values:
 
 Only one stage is implemented at a time.
 
-After each completed stage, the developer must test the live GitHub Pages deployment and explicitly approve the next stage before implementation continues.tage before implementation continues.
+After each completed stage, the developer must test the live GitHub Pages deployment and explicitly approve the next stage before implementation continues.
+
+## File-change principle
+
+Minimise repository churn.
+
+Future stages should preferentially extend existing files rather than creating additional files. A new file should only be introduced when it provides a clear separation of responsibility or is otherwise essential to maintainability.
