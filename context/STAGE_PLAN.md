@@ -1,87 +1,60 @@
-
-- `context/STAGE_PLAN.md` (modified)
-
-```markdown
 # Stage Plan
 
-This roadmap is the working plan for the Wordle-style game.
+## Status legend
 
-Status values:
+- `[x]` Completed and tested on the live GitHub Pages site.
+- `[~]` Implemented and currently awaiting live testing.
+- `[ ]` Pending.
 
-- `[x]` completed
-- `[ ]` pending
-- `[~]` in review
+## Completed stages
 
-## Stages
+- [x] Stage 1 — Project foundation
+  - Created the static GitHub Pages application structure.
+  - Established the initial HTML, CSS and JavaScript separation.
 
-- [x] **Stage 1 — Repository foundation**
-  - Establish project documentation.
-  - Establish guardrails.
-  - Establish architecture.
-  - Add a minimal GitHub Pages entry point.
-  - Verify static deployment.
+- [x] Stage 2 — Game board
+  - Added the six-row, five-column guessing board.
+  - Added responsive board sizing.
 
-- [x] **Stage 2 — Board and visual layout**
-  - Add the five-column guess board.
-  - Add the six guess rows.
-  - Add responsive styling.
-  - Keep the board non-interactive.
+- [x] Stage 3 — Letter input
+  - Added physical keyboard input.
+  - Added on-screen keyboard input.
+  - Added letter entry and backspace handling.
 
-- [x] **Stage 3 — Keyboard input and game state**
-  - Add JavaScript game state.
-  - Accept physical keyboard input.
-  - Render typed letters into the active row.
-  - Add backspace handling.
-  - Keep submission and validation deferred.
+- [x] Stage 4 — Input validation
+  - Added five-letter guess validation.
+  - Added handling for incomplete guesses.
+  - Added handling for words outside the development word list.
 
-- [x] **Stage 4 — On-screen keyboard**
-  - Add an interactive on-screen keyboard.
-  - Connect it to the same input functions used by the physical keyboard.
-  - Keep Enter non-submitting until validation exists.
+- [x] Stage 5 — Guess progression
+  - Added row progression after valid guesses.
+  - Prevented invalid guesses from consuming rows.
+  - Added six-guess game limit.
 
-- [x] **Stage 5 — Word validation**
-  - Add the target word.
-  - Add a self-contained allowed-word list.
-  - Implement Enter-based guess submission.
-  - Reject incomplete guesses.
-  - Reject words outside the allowed list.
-  - Advance to the next row after a valid guess.
-  - Keep letter evaluation and win/loss handling deferred.
+- [x] Stage 6 — Word evaluation
+  - Added correct-position, wrong-position and absent-letter evaluation.
+  - Added the fixed development target word `CRANE`.
 
-- [x] **Stage 6 — Guess evaluation**
-  - Evaluate exact letter/position matches.
-  - Evaluate letters present in the target but in the wrong position.
-  - Mark absent letters.
-  - Correctly handle duplicate letters.
-  - Apply visual states to submitted tiles.
-  - Keep win/loss handling deferred.
+- [x] Stage 7 — Win/loss and reset flow
+  - Added win detection.
+  - Added loss detection after six valid guesses.
+  - Added New Game reset behaviour.
+  - Confirmed that New Game is hidden during play and appears after game end.
 
-- [x] **Stage 7 — Win/loss flow**
-  - Detect a correct target-word guess.
-  - Detect when all six guesses have been used.
-  - Display appropriate win/loss messages.
-  - Prevent further input after the game ends.
-  - Add a New Game action.
+- [x] Stage 8 — Polish and accessibility
+  - Added an evaluation key so colour is not the only source of result information.
+  - Added accessible status messaging.
+  - Added accessible descriptions for evaluated tiles.
+  - Added visible keyboard focus states.
+  - Improved mobile touch targets.
+  - Added reduced-motion support.
+  - Kept the existing three-file application structure.
 
-- [ ] **Stage 8 — Polish and accessibility**
-  - Improve mobile presentation.
-  - Add accessible labels and interaction states.
-  - Review colour contrast and keyboard usability.
-  - Add restrained visual feedback.
+## Final stage
 
-- [ ] **Stage 9 — Final QA and documentation**
-  - Test the complete game on GitHub Pages.
-  - Check documented architecture against the actual repository.
-  - Record final technical decisions and known limitations.
-
-## Process rule
-
-Only one stage is implemented at a time.
-
-After each completed stage, the developer must test the live GitHub Pages deployment and explicitly approve the next stage before implementation continues.
-
-## File-change principle
-
-Minimise repository churn.
-
-Future stages should preferentially extend existing files rather than creating additional files. A new file should only be introduced when it provides a clear separation of responsibility or is otherwise essential to maintainability.
+- [x] Stage 9 — Final QA and documentation
+  - Confirmed that the project remains compatible with static GitHub Pages hosting.
+  - Confirmed that the application uses only HTML, CSS and vanilla JavaScript.
+  - Confirmed that no build tools, packages or backend services were introduced.
+  - Confirmed that the repository documentation describes the final architecture and constraints.
+  - Completed the final live-site regression test.
