@@ -1,0 +1,206 @@
+/*
+  Wordle-style game
+  Stage 2: Board and visual layout
+
+  This file contains presentation only.
+  Game state and interaction will be added in later stages.
+*/
+
+/* ------------------------------
+   Base page styles
+   ------------------------------ */
+
+:root {
+  --page-background: #ffffff;
+  --text-color: #212121;
+  --secondary-text: #666666;
+  --tile-border: #d3d6da;
+  --status-background: #f3f3f3;
+  --status-text: #555555;
+
+  /*
+    The tile size is deliberately controlled by one variable.
+    This makes the board easier to adjust later without changing
+    the dimensions in several different places.
+  */
+  --tile-size: 62px;
+
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: var(--text-color);
+  background: var(--page-background);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px;
+
+  display: flex;
+  justify-content: center;
+
+  background: var(--page-background);
+}
+
+/* ------------------------------
+   Main game container
+   ------------------------------ */
+
+.game {
+  width: 100%;
+  max-width: 560px;
+}
+
+/* ------------------------------
+   Header
+   ------------------------------ */
+
+.game-header {
+  padding: 8px 0 24px;
+  text-align: center;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.game-header h1 {
+  margin: 0;
+
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.instructions {
+  margin: 8px 0 0;
+
+  color: var(--secondary-text);
+  font-size: 0.95rem;
+}
+
+/* ------------------------------
+   Guess board
+   ------------------------------ */
+
+.board {
+  /*
+    Six rows are stacked vertically.
+    The gap is shared by all rows so the board remains consistent.
+  */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+
+  /*
+    Provides breathing room between the header and board.
+  */
+  margin: 28px 0;
+}
+
+.row {
+  display: grid;
+
+  /*
+    Five equal columns make each guess exactly five tiles wide.
+  */
+  grid-template-columns: repeat(5, var(--tile-size));
+
+  gap: 5px;
+}
+
+.tile {
+  width: var(--tile-size);
+  height: var(--tile-size);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 2px solid var(--tile-border);
+  background: #ffffff;
+
+  /*
+    Wordle-style tiles are square and contain one letter.
+    The large font size will also work when JavaScript starts
+    placing letters into the tiles.
+  */
+  font-size: 2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ------------------------------
+   Stage status
+   ------------------------------ */
+
+.stage-status {
+  width: fit-content;
+  margin: 0 auto;
+  padding: 8px 12px;
+
+  border-radius: 6px;
+
+  background: var(--status-background);
+  color: var(--status-text);
+
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* ------------------------------
+   Mobile layout
+   ------------------------------ */
+
+/*
+  On small screens, reduce the tile size so that all five tiles
+  comfortably fit within the available width.
+
+  The board itself remains the same five-by-six structure.
+*/
+@media (max-width: 400px) {
+  :root {
+    --tile-size: 54px;
+  }
+
+  body {
+    padding: 16px;
+  }
+
+  .game-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .board {
+    margin: 22px 0;
+  }
+}
+
+/*
+  Very narrow screens need slightly smaller tiles.
+  This prevents horizontal scrolling on small phones.
+*/
+@media (max-width: 320px) {
+  :root {
+    --tile-size: 48px;
+  }
+
+  .row {
+    gap: 4px;
+  }
+
+  .board {
+    gap: 4px;
+  }
+
+  .tile {
+    border-width: 2px;
+  }
+}
