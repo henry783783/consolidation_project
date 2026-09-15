@@ -23,12 +23,14 @@
     </header>
 
     <!--
-      The board is currently visual only.
+      The board is controlled by js/game.js.
 
       Each row represents one possible guess.
       Each tile represents one letter.
 
-      JavaScript will populate and update these tiles in a later stage.
+      Stage 3 allows letters to be entered into the first row.
+      Guess submission and moving between rows are intentionally
+      deferred until later stages.
     -->
     <section
       class="board"
@@ -84,8 +86,14 @@
     </section>
 
     <p class="stage-status">
-      Stage 2 — Board layout ready
+      Stage 3 — Keyboard input ready
     </p>
   </main>
+
+  <!--
+    JavaScript is loaded at the end of the body so that all board
+    elements already exist when game.js searches for them.
+  -->
+  <script src="js/game.js"></script>
 </body>
 </html>
