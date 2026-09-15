@@ -4,83 +4,87 @@
   <meta charset="UTF-8">
 
   <!--
-    The viewport setting is important for mobile devices.
-    Without it, mobile browsers may render the page as if it were a
-    much wider desktop page.
+    Ensures the layout uses the device's actual width on mobile.
   -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Wordle-Style Game</title>
 
-  <style>
-    /*
-      Stage 1 intentionally uses a tiny amount of inline CSS.
-
-      A dedicated css/style.css file will be introduced when the
-      visual game board is added in a later stage.
-    */
-
-    :root {
-      color-scheme: light;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
-      background: #f7f7f7;
-      color: #222;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      min-height: 100vh;
-      margin: 0;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-    }
-
-    main {
-      width: min(100%, 560px);
-      padding: 32px 24px;
-      text-align: center;
-      background: #ffffff;
-      border: 1px solid #dddddd;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
-    }
-
-    h1 {
-      margin: 0 0 12px;
-      font-size: 2rem;
-    }
-
-    p {
-      margin: 8px 0;
-      line-height: 1.5;
-    }
-
-    .status {
-      margin-top: 20px;
-      padding: 12px;
-      border-radius: 8px;
-      background: #e8f5e9;
-      color: #1b5e20;
-      font-weight: 600;
-    }
-  </style>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
-  <main>
-    <h1>Wordle-Style Game</h1>
+  <main class="game">
+    <header class="game-header">
+      <h1>Wordle</h1>
+      <p class="instructions">
+        Guess the five-letter word in six tries.
+      </p>
+    </header>
 
-    <p>
-      The project foundation is deployed successfully.
-    </p>
+    <!--
+      The board is currently visual only.
 
-    <p class="status">
-      Stage 1 complete — GitHub Pages is loading the application.
+      Each row represents one possible guess.
+      Each tile represents one letter.
+
+      JavaScript will populate and update these tiles in a later stage.
+    -->
+    <section
+      class="board"
+      aria-label="Word guessing board"
+    >
+      <div class="row" aria-label="Guess 1">
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+      </div>
+
+      <div class="row" aria-label="Guess 2">
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+      </div>
+
+      <div class="row" aria-label="Guess 3">
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+      </div>
+
+      <div class="row" aria-label="Guess 4">
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+      </div>
+
+      <div class="row" aria-label="Guess 5">
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+      </div>
+
+      <div class="row" aria-label="Guess 6">
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+      </div>
+    </section>
+
+    <p class="stage-status">
+      Stage 2 — Board layout ready
     </p>
   </main>
 </body>
