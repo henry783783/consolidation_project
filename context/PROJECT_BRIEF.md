@@ -18,7 +18,9 @@ The game will eventually provide both an on-screen keyboard and keyboard-input s
 
 ## Current stage
 
-Stage 1 establishes only the repository foundation and a visible static shell.
+Stage 2 establishes the visual guessing board.
+
+The board contains six guess rows and five letter tiles per row. It is currently non-interactive.
 
 No guessing, word validation, scoring, persistence, animations, or game-state logic is implemented yet.
 
