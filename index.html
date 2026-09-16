@@ -1,8 +1,9 @@
+```html
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
@@ -10,138 +11,326 @@
 
   <title>Wordle-style Game</title>
 
-  <link rel="stylesheet" href="css/style.css">
+  <link
+    rel="stylesheet"
+    href="./css/style.css"
+  >
 </head>
 
 <body>
+
   <main class="game">
+
     <header class="game-header">
-      <h1>Wordle</h1>
 
-```
-  <p class="instructions">
-    Guess the selected-length word in six tries.
-  </p>
+      <h1>Wordle-style Game</h1>
 
-  <div class="game-options">
-    <label for="word-length">
-      Word length
-    </label>
+      <p class="instructions">
+        Guess the 5-letter word in six tries.
+      </p>
 
-    <select id="word-length">
-      <option value="random">Random</option>
-      <option value="4">4 letters</option>
-      <option value="5" selected>5 letters</option>
-      <option value="6">6 letters</option>
-      <option value="7">7 letters</option>
-    </select>
-  </div>
-</header>
+      <div class="game-controls">
 
-<section
-  class="board"
-  aria-label="Guess board"
->
-  <!--
-    JavaScript creates the rows and tiles according to
-    the selected word length.
-  -->
-</section>
+        <label for="word-length">
+          Word length:
+        </label>
 
-<p
-  class="evaluation-key"
-  aria-label="Guess result key"
->
-  <span>
-    <strong>Green</strong> = correct position
-  </span>
+        <select id="word-length">
+          <option value="4">4 letters</option>
+          <option value="5" selected>5 letters</option>
+          <option value="6">6 letters</option>
+          <option value="7">7 letters</option>
+          <option value="random">Random</option>
+        </select>
 
-  <span>
-    <strong>Yellow</strong> = correct letter, wrong position
-  </span>
+        <button
+          id="new-game"
+          type="button"
+          hidden
+        >
+          New Game
+        </button>
 
-  <span>
-    <strong>Grey</strong> = letter not present
-  </span>
-</p>
+      </div>
 
-<section
-  class="keyboard"
-  aria-label="On-screen keyboard"
->
-  <div class="keyboard-row">
-    <button type="button" data-key="Q">Q</button>
-    <button type="button" data-key="W">W</button>
-    <button type="button" data-key="E">E</button>
-    <button type="button" data-key="R">R</button>
-    <button type="button" data-key="T">T</button>
-    <button type="button" data-key="Y">Y</button>
-    <button type="button" data-key="U">U</button>
-    <button type="button" data-key="I">I</button>
-    <button type="button" data-key="O">O</button>
-    <button type="button" data-key="P">P</button>
-  </div>
+      <p
+        class="stage-status"
+        aria-live="polite"
+      >
+        Stage 17: Loading game data…
+      </p>
 
-  <div class="keyboard-row keyboard-row-middle">
-    <button type="button" data-key="A">A</button>
-    <button type="button" data-key="S">S</button>
-    <button type="button" data-key="D">D</button>
-    <button type="button" data-key="F">F</button>
-    <button type="button" data-key="G">G</button>
-    <button type="button" data-key="H">H</button>
-    <button type="button" data-key="J">J</button>
-    <button type="button" data-key="K">K</button>
-    <button type="button" data-key="L">L</button>
-  </div>
+    </header>
 
-  <div class="keyboard-row">
-    <button
-      type="button"
-      class="keyboard-wide"
-      data-key="enter"
+
+    <section
+      class="game-board"
+      aria-label="Wordle game board"
     >
-      Enter
-    </button>
 
-    <button type="button" data-key="Z">Z</button>
-    <button type="button" data-key="X">X</button>
-    <button type="button" data-key="C">C</button>
-    <button type="button" data-key="V">V</button>
-    <button type="button" data-key="B">B</button>
-    <button type="button" data-key="N">N</button>
-    <button type="button" data-key="M">M</button>
+      <div
+        class="board"
+        aria-label="Wordle board"
+      ></div>
 
-    <button
-      type="button"
-      class="keyboard-wide"
-      data-key="backspace"
-      aria-label="Backspace"
+    </section>
+
+
+    <section
+      class="keyboard"
+      aria-label="On-screen keyboard"
     >
-      ←
-    </button>
-  </div>
-</section>
 
-<p
-  class="stage-status"
-  role="status"
-  aria-live="polite"
->
-  Stage 16: Loading dictionary…
-</p>
+      <div class="keyboard-row">
 
-<button
-  id="new-game"
-  type="button"
-  hidden
->
-  New Game
-</button>
-```
+        <button
+          type="button"
+          data-key="Q"
+          aria-label="Q"
+        >
+          Q
+        </button>
+
+        <button
+          type="button"
+          data-key="W"
+          aria-label="W"
+        >
+          W
+        </button>
+
+        <button
+          type="button"
+          data-key="E"
+          aria-label="E"
+        >
+          E
+        </button>
+
+        <button
+          type="button"
+          data-key="R"
+          aria-label="R"
+        >
+          R
+        </button>
+
+        <button
+          type="button"
+          data-key="T"
+          aria-label="T"
+        >
+          T
+        </button>
+
+        <button
+          type="button"
+          data-key="Y"
+          aria-label="Y"
+        >
+          Y
+        </button>
+
+        <button
+          type="button"
+          data-key="U"
+          aria-label="U"
+        >
+          U
+        </button>
+
+        <button
+          type="button"
+          data-key="I"
+          aria-label="I"
+        >
+          I
+        </button>
+
+        <button
+          type="button"
+          data-key="O"
+          aria-label="O"
+        >
+          O
+        </button>
+
+        <button
+          type="button"
+          data-key="P"
+          aria-label="P"
+        >
+          P
+        </button>
+
+      </div>
+
+
+      <div class="keyboard-row">
+
+        <button
+          type="button"
+          data-key="A"
+          aria-label="A"
+        >
+          A
+        </button>
+
+        <button
+          type="button"
+          data-key="S"
+          aria-label="S"
+        >
+          S
+        </button>
+
+        <button
+          type="button"
+          data-key="D"
+          aria-label="D"
+        >
+          D
+        </button>
+
+        <button
+          type="button"
+          data-key="F"
+          aria-label="F"
+        >
+          F
+        </button>
+
+        <button
+          type="button"
+          data-key="G"
+          aria-label="G"
+        >
+          G
+        </button>
+
+        <button
+          type="button"
+          data-key="H"
+          aria-label="H"
+        >
+          H
+        </button>
+
+        <button
+          type="button"
+          data-key="J"
+          aria-label="J"
+        >
+          J
+        </button>
+
+        <button
+          type="button"
+          data-key="K"
+          aria-label="K"
+        >
+          K
+        </button>
+
+        <button
+          type="button"
+          data-key="L"
+          aria-label="L"
+        >
+          L
+        </button>
+
+      </div>
+
+
+      <div class="keyboard-row">
+
+        <button
+          type="button"
+          data-key="enter"
+          aria-label="Enter"
+          class="wide-key"
+        >
+          Enter
+        </button>
+
+        <button
+          type="button"
+          data-key="Z"
+          aria-label="Z"
+        >
+          Z
+        </button>
+
+        <button
+          type="button"
+          data-key="X"
+          aria-label="X"
+        >
+          X
+        </button>
+
+        <button
+          type="button"
+          data-key="C"
+          aria-label="C"
+        >
+          C
+        </button>
+
+        <button
+          type="button"
+          data-key="V"
+          aria-label="V"
+        >
+          V
+        </button>
+
+        <button
+          type="button"
+          data-key="B"
+          aria-label="B"
+        >
+          B
+        </button>
+
+        <button
+          type="button"
+          data-key="N"
+          aria-label="N"
+        >
+          N
+        </button>
+
+        <button
+          type="button"
+          data-key="M"
+          aria-label="M"
+        >
+          M
+        </button>
+
+        <button
+          type="button"
+          data-key="backspace"
+          aria-label="Backspace"
+          class="wide-key"
+        >
+          Backspace
+        </button>
+
+      </div>
+
+    </section>
 
   </main>
 
-  <script src="js/game.js"></script>
+
+  <script
+    src="./js/game.js"
+    defer
+  ></script>
 
 </body>
 </html>
+```
