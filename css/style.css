@@ -49,7 +49,8 @@ body {
   background: var(--page-background);
 }
 
-button {
+button,
+select {
   font: inherit;
 }
 
@@ -73,10 +74,41 @@ button {
 }
 
 .instructions {
-  margin: 8px 0 0;
+  margin: 8px 0 16px;
 
   color: var(--secondary-text);
   font-size: 0.95rem;
+}
+
+.game-options {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.game-options label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+#word-length {
+  min-height: 38px;
+
+  padding: 5px 30px 5px 9px;
+
+  border: 1px solid #878a8c;
+  border-radius: 5px;
+
+  background: #ffffff;
+  color: var(--text-color);
+
+  cursor: pointer;
+}
+
+#word-length:focus-visible {
+  outline: 3px solid var(--focus-color);
+  outline-offset: 3px;
 }
 
 .board {
@@ -92,13 +124,12 @@ button {
   display: grid;
 
   /*
-    The JavaScript sets --word-length on each row.
-
-    This replaces the previous hard-coded five-column layout and
-    allows future stages to change the number of letters without
-    changing this CSS rule.
+    JavaScript sets --word-length on each row.
   */
-  grid-template-columns: repeat(var(--word-length, 5), var(--tile-size));
+  grid-template-columns: repeat(
+    var(--word-length, 5),
+    var(--tile-size)
+  );
 
   gap: 5px;
 }
@@ -142,10 +173,6 @@ button {
   color: var(--absent-text);
 }
 
-/*
-  This visible key means the evaluation system is not
-  communicated by colour alone.
-*/
 .evaluation-key {
   display: flex;
   flex-direction: column;
@@ -304,6 +331,10 @@ button {
   .evaluation-key {
     font-size: 0.74rem;
   }
+
+  .game-options {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 320px) {
@@ -337,10 +368,6 @@ button {
   }
 }
 
-/*
-  Respect users who have requested reduced motion
-  in their operating system or browser.
-*/
 @media (prefers-reduced-motion: reduce) {
   .tile {
     transition: none;
