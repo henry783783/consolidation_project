@@ -92,7 +92,7 @@ Replace the small development dictionary with the selected
 comprehensive word data, filtered and organised for the
 supported word lengths.
 
-[ ] Stage 17 — Dictionary validation and edge cases
+[X] Stage 17 — Dictionary validation and edge cases
 Thoroughly test the expanded word data, including word-length
 filtering, duplicate letters, unusual valid words, invalid
 guesses, target selection and data-loading/error behaviour.
