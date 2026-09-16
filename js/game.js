@@ -1,8 +1,9 @@
 /*
   Wordle-style game
-  Stage 10: Dynamic word-length foundation
+  Stage 11: Supported word-length selection
 
   This file controls:
+  - Word-length selection.
   - Dynamic board creation.
   - Physical keyboard input.
   - On-screen keyboard input.
@@ -13,13 +14,16 @@
   - Win/loss detection.
   - New-game/reset behaviour.
 
-  IMPORTANT:
-  The game currently remains a five-letter game with CRANE as the
-  fixed development target.
+  Supported lengths at this stage:
+  4, 5, 6 and 7 letters.
 
-  WORD_LENGTH is now the single source of truth for the number of
-  letters in a word. Future stages can change this value or make it
-  selectable without rebuilding the board HTML manually.
+  The word collections below are deliberately small development
+  collections. Stage 14 will replace them with the project's
+  comprehensive English word dataset.
+
+  Random target selection is intentionally NOT implemented yet.
+  Each length currently has a fixed development target so this
+  stage remains predictable and independently testable.
 */
 
 "use strict";
@@ -28,60 +32,218 @@
    Game constants
    ------------------------------ */
 
-const WORD_LENGTH = 5;
+const SUPPORTED_WORD_LENGTHS = [4, 5, 6, 7];
+const DEFAULT_WORD_LENGTH = 5;
 const MAX_GUESSES = 6;
-const targetWord = "CRANE";
 
 /*
-  Small development dictionary.
-  Only five-letter words are accepted as guesses at this stage.
+  Small development word collections.
+
+  These allow the newly supported lengths to be tested without
+  introducing the comprehensive dictionary before its dedicated
+  stages.
 */
-const allowedWords = new Set([
-  "ABOUT", "ABOVE", "AFTER", "AGAIN", "ALONE", "APPLE",
-  "BEACH", "BEGIN", "BLACK", "BLAME", "BLIND", "BLOCK",
-  "BRAIN", "BRAVE", "BREAD", "BREAK", "BRING", "BROWN",
-  "BUILD", "CARRY", "CAUSE", "CHAIN", "CHAIR", "CHART",
-  "CHASE", "CHEAP", "CHECK", "CHEST", "CHILD", "CLEAN",
-  "CLEAR", "CLIMB", "CLOCK", "CLOSE", "CLOUD", "COACH",
-  "COAST", "COLOR", "COUNT", "COURT", "COVER", "CRANE",
-  "CRAZY", "CREAM", "CROSS", "CROWD", "CROWN", "DANCE",
-  "DEATH", "DEPTH", "DOUBT", "DOZEN", "DREAM", "DRINK",
-  "DRIVE", "EARTH", "EMPTY", "ENJOY", "ENTER", "EQUAL",
-  "ERROR", "EVENT", "EVERY", "FAITH", "FALSE", "FIELD",
-  "FIGHT", "FINAL", "FIRST", "FLOOR", "FOCUS", "FORCE",
-  "FOUND", "FRAME", "FRONT", "FRUIT", "FUNNY", "GIANT",
-  "GIVEN", "GLASS", "GOING", "GRANT", "GRASS", "GREAT",
-  "GREEN", "GROUP", "GUESS", "HAPPY", "HEART", "HEAVY",
-  "HOUSE", "HUMAN", "IDEAL", "IMAGE", "INDEX", "INNER",
-  "ISSUE", "JOINT", "JUDGE", "KNOWN", "LARGE", "LEARN",
-  "LEAST", "LEAVE", "LIGHT", "LIMIT", "LOCAL", "LOGIC",
-  "LUCKY", "MAGIC", "MAJOR", "MATCH", "MAYBE", "METAL",
-  "MIGHT", "MINOR", "MONEY", "MONTH", "MOUSE", "MOUTH",
-  "MOVIE", "MUSIC", "NEVER", "NIGHT", "NORTH", "NOVEL",
-  "OCEAN", "OFFER", "ORDER", "OTHER", "PAINT", "PAPER",
-  "PARTY", "PEACE", "PHONE", "PIECE", "PILOT", "PLACE",
-  "PLAIN", "PLANE", "PLANT", "POINT", "POWER", "PRESS",
-  "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR", "PROUD",
-  "QUEEN", "QUICK", "QUIET", "RADIO", "RAISE", "RANGE",
-  "REACH", "READY", "RIGHT", "RIVER", "ROUND", "ROYAL",
-  "SCALE", "SCENE", "SCORE", "SENSE", "SERVE", "SEVEN",
-  "SHARE", "SHARP", "SHEEP", "SHEET", "SHIFT", "SHINE",
-  "SHORT", "SHOUT", "SIGHT", "SINCE", "SIXTH", "SMALL",
-  "SMART", "SMILE", "SOUTH", "SPACE", "SPEAK", "SPEED",
-  "SPEND", "SPINE", "SPLIT", "SPORT", "STAGE", "STAIR",
-  "STAND", "START", "STATE", "STEAM", "STEEL", "STICK",
-  "STILL", "STOCK", "STONE", "STORE", "STORM", "STORY",
-  "SUGAR", "TABLE", "TEACH", "THANK", "THEIR", "THERE",
-  "THESE", "THING", "THINK", "THIRD", "THOSE", "THREE",
-  "THROW", "TIGHT", "TIMES", "TITLE", "TODAY", "TOTAL",
-  "TOUCH", "TOWER", "TRACK", "TRADE", "TRAIN", "TREAT",
-  "TRIAL", "TRUST", "TRUTH", "UNCLE", "UNDER", "UNION",
-  "UNTIL", "UPPER", "USUAL", "VALUE", "VIDEO", "VISIT",
-  "VOICE", "WASTE", "WATCH", "WATER", "WHEEL", "WHERE",
-  "WHILE", "WHITE", "WHOLE", "WHOSE", "WOMAN", "WORLD",
-  "WORRY", "WORTH", "WOULD", "WRITE", "WRONG", "YOUNG",
-  "YOUTH"
-]);
+const developmentWords = {
+  4: new Set([
+    "BALL",
+    "BEAR",
+    "BIRD",
+    "BOOK",
+    "COLD",
+    "DARK",
+    "FISH",
+    "GAME",
+    "GATE",
+    "HAND",
+    "HEAD",
+    "HOME",
+    "HOPE",
+    "KING",
+    "LIFE",
+    "LION",
+    "LOVE",
+    "MOON",
+    "RAIN",
+    "ROAD",
+    "STAR",
+    "TREE",
+    "WIND",
+    "WORD"
+  ]),
+
+  5: new Set([
+    "ABOUT", "ABOVE", "AFTER", "AGAIN", "ALONE", "APPLE",
+    "BEACH", "BEGIN", "BLACK", "BLAME", "BLIND", "BLOCK",
+    "BRAIN", "BRAVE", "BREAD", "BREAK", "BRING", "BROWN",
+    "BUILD", "CARRY", "CAUSE", "CHAIN", "CHAIR", "CHART",
+    "CHASE", "CHEAP", "CHECK", "CHEST", "CHILD", "CLEAN",
+    "CLEAR", "CLIMB", "CLOCK", "CLOSE", "CLOUD", "COACH",
+    "COAST", "COLOR", "COUNT", "COURT", "COVER", "CRANE",
+    "CRAZY", "CREAM", "CROSS", "CROWD", "CROWN", "DANCE",
+    "DEATH", "DEPTH", "DOUBT", "DOZEN", "DREAM", "DRINK",
+    "DRIVE", "EARTH", "EMPTY", "ENJOY", "ENTER", "EQUAL",
+    "ERROR", "EVENT", "EVERY", "FAITH", "FALSE", "FIELD",
+    "FIGHT", "FINAL", "FIRST", "FLOOR", "FOCUS", "FORCE",
+    "FOUND", "FRAME", "FRONT", "FRUIT", "FUNNY", "GIANT",
+    "GIVEN", "GLASS", "GOING", "GRANT", "GRASS", "GREAT",
+    "GREEN", "GROUP", "GUESS", "HAPPY", "HEART", "HEAVY",
+    "HOUSE", "HUMAN", "IDEAL", "IMAGE", "INDEX", "INNER",
+    "ISSUE", "JOINT", "JUDGE", "KNOWN", "LARGE", "LEARN",
+    "LEAST", "LEAVE", "LIGHT", "LIMIT", "LOCAL", "LOGIC",
+    "LUCKY", "MAGIC", "MAJOR", "MATCH", "MAYBE", "METAL",
+    "MIGHT", "MINOR", "MONEY", "MONTH", "MOUSE", "MOUTH",
+    "MOVIE", "MUSIC", "NEVER", "NIGHT", "NORTH", "NOVEL",
+    "OCEAN", "OFFER", "ORDER", "OTHER", "PAINT", "PAPER",
+    "PARTY", "PEACE", "PHONE", "PIECE", "PILOT", "PLACE",
+    "PLAIN", "PLANE", "PLANT", "POINT", "POWER", "PRESS",
+    "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR", "PROUD",
+    "QUEEN", "QUICK", "QUIET", "RADIO", "RAISE", "RANGE",
+    "REACH", "READY", "RIGHT", "RIVER", "ROUND", "ROYAL",
+    "SCALE", "SCENE", "SCORE", "SENSE", "SERVE", "SEVEN",
+    "SHARE", "SHARP", "SHEEP", "SHEET", "SHIFT", "SHINE",
+    "SHORT", "SHOUT", "SIGHT", "SINCE", "SIXTH", "SMALL",
+    "SMART", "SMILE", "SOUTH", "SPACE", "SPEAK", "SPEED",
+    "SPEND", "SPINE", "SPLIT", "SPORT", "STAGE", "STAIR",
+    "STAND", "START", "STATE", "STEAM", "STEEL", "STICK",
+    "STILL", "STOCK", "STONE", "STORE", "STORM", "STORY",
+    "SUGAR", "TABLE", "TEACH", "THANK", "THEIR", "THERE",
+    "THESE", "THING", "THINK", "THIRD", "THOSE", "THREE",
+    "THROW", "TIGHT", "TIMES", "TITLE", "TODAY", "TOTAL",
+    "TOUCH", "TOWER", "TRACK", "TRADE", "TRAIN", "TREAT",
+    "TRIAL", "TRUST", "TRUTH", "UNCLE", "UNDER", "UNION",
+    "UNTIL", "UPPER", "USUAL", "VALUE", "VIDEO", "VISIT",
+    "VOICE", "WASTE", "WATCH", "WATER", "WHEEL", "WHERE",
+    "WHILE", "WHITE", "WHOLE", "WHOSE", "WOMAN", "WORLD",
+    "WORRY", "WORTH", "WOULD", "WRITE", "WRONG", "YOUNG",
+    "YOUTH"
+  ]),
+
+  6: new Set([
+    "ALMOST",
+    "ALWAYS",
+    "ANSWER",
+    "AUTUMN",
+    "BEFORE",
+    "BETTER",
+    "BORDER",
+    "BRIGHT",
+    "BROKEN",
+    "BUTTON",
+    "CHANGE",
+    "CHOOSE",
+    "CIRCLE",
+    "CLOSED",
+    "COFFEE",
+    "COMMON",
+    "DANGER",
+    "DEGREE",
+    "DESERT",
+    "DOUBLE",
+    "EFFECT",
+    "ENOUGH",
+    "FAMILY",
+    "FATHER",
+    "FIGURE",
+    "FOLLOW",
+    "FRIEND",
+    "GARDEN",
+    "GROUND",
+    "HAPPEN",
+    "HEALTH",
+    "HONEST",
+    "INSIDE",
+    "ISLAND",
+    "LETTER",
+    "LITTLE",
+    "MARKET",
+    "MEMORY",
+    "MIDDLE",
+    "MORNING",
+    "MOTHER",
+    "NUMBER",
+    "OFFICE",
+    "PERSON",
+    "PLANET",
+    "PUBLIC",
+    "REASON",
+    "RESULT",
+    "SCHOOL",
+    "SIMPLE",
+    "SISTER",
+    "SOCIAL",
+    "SUMMER",
+    "SYSTEM",
+    "TARGET",
+    "TRAVEL",
+    "UNIQUE",
+    "WINDOW",
+    "WINTER",
+    "YELLOW"
+  ]),
+
+  7: new Set([
+    "ANOTHER",
+    "BALANCE",
+    "BECAUSE",
+    "BELIEVE",
+    "BETWEEN",
+    "CAPTAIN",
+    "CENTRAL",
+    "CERTAIN",
+    "COUNTRY",
+    "DECIDED",
+    "DURING",
+    "EXAMPLE",
+    "EXACTLY",
+    "FREEDOM",
+    "FRIENDS",
+    "GENERAL",
+    "HISTORY",
+    "HOWEVER",
+    "IMAGINE",
+    "IMPORTANT",
+    "INCLUDE",
+    "KITCHEN",
+    "LANGUAGE",
+    "MEETING",
+    "MORNING",
+    "NATURAL",
+    "NOTHING",
+    "PATTERN",
+    "PERFECT",
+    "PICTURE",
+    "POPULAR",
+    "PRESENT",
+    "PROBLEM",
+    "PROGRAM",
+    "PROMISE",
+    "RECEIVE",
+    "RESULTS",
+    "SCIENCE",
+    "SEVERAL",
+    "SPECIAL",
+    "STATION",
+    "STUDENT",
+    "SUPPORT",
+    "TEACHER",
+    "THOUGHT",
+    "TOGETHER",
+    "WITHOUT"
+  ])
+};
+
+/*
+  Fixed development target for each supported length.
+
+  This is deliberately deterministic. Stage 14 will replace
+  this mechanism with random target selection.
+*/
+const developmentTargets = {
+  4: "STAR",
+  5: "CRANE",
+  6: "TARGET",
+  7: "SPECIAL"
+};
 
 /* ------------------------------
    Page elements and game state
@@ -90,6 +252,10 @@ const allowedWords = new Set([
 const board = document.querySelector(".board");
 const statusMessage = document.querySelector(".stage-status");
 const newGameButton = document.querySelector("#new-game");
+const wordLengthSelect = document.querySelector("#word-length");
+
+let WORD_LENGTH = DEFAULT_WORD_LENGTH;
+let targetWord = developmentTargets[DEFAULT_WORD_LENGTH];
 
 let rows = [];
 let currentRow = 0;
@@ -97,16 +263,32 @@ let currentTile = 0;
 let gameOver = false;
 
 /* ------------------------------
+   Word-length helpers
+   ------------------------------ */
+
+function isSupportedWordLength(length) {
+  return SUPPORTED_WORD_LENGTHS.includes(length);
+}
+
+function getWordLengthWords() {
+  return developmentWords[WORD_LENGTH] || new Set();
+}
+
+function updateInstructions() {
+  const instructions = document.querySelector(".instructions");
+
+  if (!instructions) {
+    return;
+  }
+
+  instructions.textContent =
+    `Guess the ${WORD_LENGTH}-letter word in six tries.`;
+}
+
+/* ------------------------------
    Board creation
    ------------------------------ */
 
-/*
-  Create the board from WORD_LENGTH instead of relying on hard-coded
-  tile elements in index.html.
-
-  This is deliberately kept as a small function so future stages can
-  change WORD_LENGTH without needing to redesign the rest of the game.
-*/
 function createBoard() {
   if (!board) {
     return;
@@ -121,7 +303,11 @@ function createBoard() {
     row.setAttribute("aria-label", `Guess ${rowIndex + 1}`);
     row.style.setProperty("--word-length", WORD_LENGTH);
 
-    for (let tileIndex = 0; tileIndex < WORD_LENGTH; tileIndex += 1) {
+    for (
+      let tileIndex = 0;
+      tileIndex < WORD_LENGTH;
+      tileIndex += 1
+    ) {
       const tile = document.createElement("div");
 
       tile.className = "tile";
@@ -139,20 +325,33 @@ function createBoard() {
   rows = Array.from(board.querySelectorAll(".row"));
 }
 
-/*
-  Build the board before any input can occur.
-*/
-createBoard();
+/* ------------------------------
+   Game initialisation
+   ------------------------------ */
 
-/*
-  Establish the initial UI state explicitly.
+function initialiseGame() {
+  targetWord = developmentTargets[WORD_LENGTH];
 
-  This ensures the New Game button starts hidden even if a browser
-  has retained an older stylesheet or page state.
-*/
-if (newGameButton) {
-  newGameButton.hidden = true;
+  createBoard();
+  updateInstructions();
+
+  currentRow = 0;
+  currentTile = 0;
+  gameOver = false;
+
+  showMessage(
+    `Stage 11: ${WORD_LENGTH}-letter game`
+  );
+
+  if (newGameButton) {
+    newGameButton.hidden = true;
+  }
 }
+
+/*
+  Build the initial five-letter game.
+*/
+initialiseGame();
 
 /* ------------------------------
    Board helpers
@@ -183,14 +382,12 @@ function showMessage(message) {
   }
 }
 
-/*
-  Give a tile a useful accessible description.
-
-  The visible letter remains unchanged. The aria-label gives
-  assistive technology enough information to understand the
-  active guess as it is being entered.
-*/
-function updateTileInputLabel(tile, letter, rowIndex, tileIndex) {
+function updateTileInputLabel(
+  tile,
+  letter,
+  rowIndex,
+  tileIndex
+) {
   if (!tile) {
     return;
   }
@@ -279,7 +476,8 @@ function evaluateGuess(guess) {
       continue;
     }
 
-    const matchingIndex = remainingTargetLetters.indexOf(guess[index]);
+    const matchingIndex =
+      remainingTargetLetters.indexOf(guess[index]);
 
     if (matchingIndex !== -1) {
       results[index] = "present";
@@ -320,11 +518,6 @@ function displayEvaluation(results, rowIndex) {
 
     tiles[index].classList.add(result);
 
-    /*
-      The visual colour communicates the result to sighted users.
-      The aria-label communicates the same result to users who
-      cannot rely on colour.
-    */
     tiles[index].setAttribute(
       "aria-label",
       `Guess ${rowIndex + 1}, position ${index + 1}: ${letter}, ${getResultDescription(result)}`
@@ -371,12 +564,13 @@ function submitGuess() {
     return;
   }
 
-  if (!allowedWords.has(guess)) {
+  if (!getWordLengthWords().has(guess)) {
     showMessage("Word not in list");
     return;
   }
 
   const results = evaluateGuess(guess);
+
   displayEvaluation(results, currentRow);
 
   if (guess === targetWord) {
@@ -400,21 +594,39 @@ function submitGuess() {
    ------------------------------ */
 
 function startNewGame() {
-  /*
-    Rebuild the board so the reset behaviour is also compatible
-    with future word-length changes.
-  */
-  createBoard();
+  initialiseGame();
+}
 
-  currentRow = 0;
-  currentTile = 0;
-  gameOver = false;
+/* ------------------------------
+   Word-length selection
+   ------------------------------ */
 
-  showMessage("Stage 10: Dynamic word-length foundation");
-
-  if (newGameButton) {
-    newGameButton.hidden = true;
+function handleWordLengthChange() {
+  if (!wordLengthSelect) {
+    return;
   }
+
+  const selectedLength = Number(wordLengthSelect.value);
+
+  if (!isSupportedWordLength(selectedLength)) {
+    wordLengthSelect.value = String(DEFAULT_WORD_LENGTH);
+    WORD_LENGTH = DEFAULT_WORD_LENGTH;
+  } else {
+    WORD_LENGTH = selectedLength;
+  }
+
+  /*
+    Changing word length starts a fresh game so that an old
+    partially completed guess cannot be mixed with the new length.
+  */
+  initialiseGame();
+}
+
+if (wordLengthSelect) {
+  wordLengthSelect.addEventListener(
+    "change",
+    handleWordLengthChange
+  );
 }
 
 /* ------------------------------
@@ -464,7 +676,9 @@ document.addEventListener("keydown", (event) => {
    ------------------------------ */
 
 document.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-key]");
+  const button = event.target.closest(
+    "button[data-key]"
+  );
 
   if (!button) {
     return;
@@ -485,5 +699,8 @@ document.addEventListener("click", (event) => {
    ------------------------------ */
 
 if (newGameButton) {
-  newGameButton.addEventListener("click", startNewGame);
+  newGameButton.addEventListener(
+    "click",
+    startNewGame
+  );
 }
