@@ -90,7 +90,16 @@ button {
 
 .row {
   display: grid;
-  grid-template-columns: repeat(5, var(--tile-size));
+
+  /*
+    The JavaScript sets --word-length on each row.
+
+    This replaces the previous hard-coded five-column layout and
+    allows future stages to change the number of letters without
+    changing this CSS rule.
+  */
+  grid-template-columns: repeat(var(--word-length, 5), var(--tile-size));
+
   gap: 5px;
 }
 
