@@ -59,12 +59,12 @@
   - Confirmed that the repository documentation describes the final architecture and constraints.
   - Completed the final live-site regression test.
 
-[ ] Stage 10 — Dynamic word-length foundation
+[X] Stage 10 — Dynamic word-length foundation
 Remove hard-coded board dimensions and establish WORD_LENGTH
 as the game's single source of truth while retaining the
 existing five-letter CRANE development configuration.
 
-[ ] Stage 11 — Supported word-length selection
+[X] Stage 11 — Supported word-length selection
 Add an accessible player control for choosing from the
 supported word lengths.
 
