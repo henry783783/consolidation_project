@@ -1,9 +1,10 @@
 /*
   Wordle-style game
-  Stage 13: Random word-length mode
+  Stage 14: Random target selection
 
   This file controls:
   - Fixed and random word-length selection.
+  - Random target selection.
   - Dynamic board creation.
   - Physical keyboard input.
   - On-screen keyboard input.
@@ -17,12 +18,13 @@
   Supported lengths at this stage:
   4, 5, 6 and 7 letters.
 
-  The word collections below are deliberately small development
-  collections. Stage 14 will replace them with the project's
+  The word collections below remain small development
+  collections. Stage 16 will replace them with the project's
   comprehensive English word dataset.
 
-  Target selection remains deterministic at this stage.
-  Stage 14 will introduce random target selection.
+  Stage 14 makes the target word random while keeping the
+  development word collections and supported word lengths
+  unchanged.
 */
 
 "use strict";
@@ -232,30 +234,20 @@ const developmentWords = {
   ])
 };
 
-/*
-  Fixed development target for each supported length.
-
-  These remain deterministic during Stage 13.
-  Stage 14 will replace this mechanism with random targets.
-*/
-const developmentTargets = {
-  4: "STAR",
-  5: "CRANE",
-  6: "TARGET",
-  7: "SPECIAL"
-};
-
 /* ------------------------------
    Page elements and game state
    ------------------------------ */
 
 const board = document.querySelector(".board");
-const statusMessage = document.querySelector(".stage-status");
-const newGameButton = document.querySelector("#new-game");
-const wordLengthSelect = document.querySelector("#word-length");
+const statusMessage =
+  document.querySelector(".stage-status");
+const newGameButton =
+  document.querySelector("#new-game");
+const wordLengthSelect =
+  document.querySelector("#word-length");
 
 let WORD_LENGTH = DEFAULT_WORD_LENGTH;
-let targetWord = developmentTargets[DEFAULT_WORD_LENGTH];
+let targetWord = "";
 
 let rows = [];
 let currentRow = 0;
@@ -283,9 +275,45 @@ function getRandomWordLength() {
 }
 
 function isRandomWordLengthSelected() {
-  return wordLengthSelect &&
-    wordLengthSelect.value === RANDOM_WORD_LENGTH;
+  return (
+    wordLengthSelect &&
+    wordLengthSelect.value === RANDOM_WORD_LENGTH
+  );
 }
+
+/* ------------------------------
+   Target-word helpers
+   ------------------------------ */
+
+function getRandomTargetWord() {
+  const words = Array.from(getWordLengthWords());
+
+  if (words.length === 0) {
+    return "";
+  }
+
+  const randomIndex = Math.floor(
+    Math.random() * words.length
+  );
+
+  return words[randomIndex];
+}
+
+/*
+  Select a new target from the word collection for the
+  currently selected word length.
+
+  The target is deliberately chosen independently from the
+  word-length selection so that Stage 13's Random length
+  mode and Stage 14's Random target mode work together.
+*/
+function selectRandomTarget() {
+  targetWord = getRandomTargetWord();
+}
+
+/* ------------------------------
+   Instructions and messages
+   ------------------------------ */
 
 function updateInstructions() {
   const instructions =
@@ -297,6 +325,12 @@ function updateInstructions() {
 
   instructions.textContent =
     `Guess the ${WORD_LENGTH}-letter word in six tries.`;
+}
+
+function showMessage(message) {
+  if (statusMessage) {
+    statusMessage.textContent = message;
+  }
 }
 
 /* ------------------------------
@@ -318,6 +352,7 @@ function createBoard() {
     const row = document.createElement("div");
 
     row.className = "row";
+
     row.setAttribute(
       "aria-label",
       `Guess ${rowIndex + 1}`
@@ -336,6 +371,7 @@ function createBoard() {
       const tile = document.createElement("div");
 
       tile.className = "tile";
+
       tile.setAttribute(
         "aria-label",
         `Guess ${rowIndex + 1}, position ${tileIndex + 1}: empty`
@@ -380,10 +416,11 @@ function initialiseGame() {
   }
 
   /*
-    Stage 13 deliberately keeps the target deterministic
-    for each selected length. Stage 14 will randomise it.
+    Stage 14:
+    Every new game receives a fresh random target from
+    the word collection for the selected length.
   */
-  targetWord = developmentTargets[WORD_LENGTH];
+  selectRandomTarget();
 
   createBoard();
   updateInstructions();
@@ -394,11 +431,11 @@ function initialiseGame() {
 
   if (isRandomWordLengthSelected()) {
     showMessage(
-      `Stage 13: Random ${WORD_LENGTH}-letter game`
+      `Stage 14: Random ${WORD_LENGTH}-letter game`
     );
   } else {
     showMessage(
-      `Stage 13: ${WORD_LENGTH}-letter game`
+      `Stage 14: ${WORD_LENGTH}-letter game`
     );
   }
 
@@ -408,7 +445,10 @@ function initialiseGame() {
 }
 
 /*
-  Build the initial five-letter game.
+  Build the initial game.
+
+  This now selects a random target instead of always
+  starting with CRANE.
 */
 initialiseGame();
 
@@ -435,12 +475,6 @@ function getCurrentGuess() {
       tile.textContent.trim().toUpperCase()
     )
     .join("");
-}
-
-function showMessage(message) {
-  if (statusMessage) {
-    statusMessage.textContent = message;
-  }
 }
 
 function updateTileInputLabel(
@@ -507,6 +541,7 @@ function removeLetter() {
 
   if (tiles[currentTile]) {
     tiles[currentTile].textContent = "";
+
     tiles[currentTile]
       .removeAttribute("aria-label");
   }
@@ -542,6 +577,7 @@ function evaluateGuess(guess) {
       guess[index] === targetWord[index]
     ) {
       results[index] = "correct";
+
       remainingTargetLetters[index] =
         null;
     }
@@ -568,6 +604,7 @@ function evaluateGuess(guess) {
 
     if (matchingIndex !== -1) {
       results[index] = "present";
+
       remainingTargetLetters[matchingIndex] =
         null;
     }
@@ -712,10 +749,6 @@ function handleWordLengthChange() {
   if (
     selectedValue === RANDOM_WORD_LENGTH
   ) {
-    /*
-      initialiseGame() chooses the actual
-      random supported length.
-    */
     initialiseGame();
     return;
   }
@@ -736,6 +769,8 @@ function handleWordLengthChange() {
     Changing word length starts a fresh game so
     an old partially completed guess cannot be
     mixed with the new length.
+
+    initialiseGame() also selects a new random target.
   */
   initialiseGame();
 }
