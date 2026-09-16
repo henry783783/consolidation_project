@@ -1,4 +1,3 @@
-```javascript
 /*
   Wordle-style game
   Stage 16: Expanded dictionary
@@ -6,7 +5,7 @@
   This file controls:
   - Fixed and random word-length selection.
   - Random target selection.
-  - Loading the expanded word dictionaries.
+  - Dictionary loading from JSON files.
   - Dynamic board creation.
   - Physical keyboard input.
   - On-screen keyboard input.
@@ -20,13 +19,8 @@
   Supported lengths:
   4, 5, 6 and 7 letters.
 
-  Dictionary data is stored separately in:
-  - data/words-4.json
-  - data/words-5.json
-  - data/words-6.json
-  - data/words-7.json
-
-  Stage 17 will validate and curate the expanded dictionary data.
+  Stage 16 loads the word collections from the data/
+  directory rather than keeping them inside this file.
 */
 
 "use strict";
@@ -40,11 +34,31 @@ const DEFAULT_WORD_LENGTH = 5;
 const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
-const WORD_DATA_PATHS = {
-  4: "data/words-4.json",
-  5: "data/words-5.json",
-  6: "data/words-6.json",
-  7: "data/words-7.json"
+/*
+  Dictionary file locations.
+
+  These paths are relative to the JavaScript file rather
+  than relying on the current browser URL.
+
+  Expected repository structure:
+
+  /
+  ├── index.html
+  ├── css/
+  │   └── style.css
+  ├── js/
+  │   └── game.js
+  └── data/
+      ├── words-4.json
+      ├── words-5.json
+      ├── words-6.json
+      └── words-7.json
+*/
+const WORD_DATA_FILES = {
+  4: "../data/words-4.json",
+  5: "../data/words-5.json",
+  6: "../data/words-6.json",
+  7: "../data/words-7.json"
 };
 
 /* ------------------------------
@@ -71,39 +85,23 @@ let currentRow = 0;
 let currentTile = 0;
 let gameOver = false;
 
-let dictionaries = {};
+/*
+  The dictionaries are populated asynchronously
+  when the page loads.
+
+  Each property will contain a Set of uppercase words.
+*/
+const wordCollections = {
+  4: new Set(),
+  5: new Set(),
+  6: new Set(),
+  7: new Set()
+};
+
 let dictionariesLoaded = false;
-let dictionaryLoadFailed = false;
 
 /* ------------------------------
-   Word-length helpers
-   ------------------------------ */
-
-function isSupportedWordLength(length) {
-  return SUPPORTED_WORD_LENGTHS.includes(length);
-}
-
-function getWordLengthWords() {
-  return dictionaries[WORD_LENGTH] || new Set();
-}
-
-function getRandomWordLength() {
-  const randomIndex = Math.floor(
-    Math.random() * SUPPORTED_WORD_LENGTHS.length
-  );
-
-  return SUPPORTED_WORD_LENGTHS[randomIndex];
-}
-
-function isRandomWordLengthSelected() {
-  return (
-    wordLengthSelect &&
-    wordLengthSelect.value === RANDOM_WORD_LENGTH
-  );
-}
-
-/* ------------------------------
-   Status messages
+   Status helpers
    ------------------------------ */
 
 function showMessage(message) {
@@ -116,110 +114,195 @@ function showMessage(message) {
    Dictionary loading
    ------------------------------ */
 
-function normaliseDictionaryWords(words) {
-  if (!Array.isArray(words)) {
-    return [];
+/*
+  Get the directory containing this JavaScript file.
+
+  This makes the data paths work correctly when the
+  GitHub Pages site is hosted under a repository path
+  such as:
+
+  https://username.github.io/wordle/
+
+  rather than only at:
+
+  https://username.github.io/
+*/
+function getJavaScriptDirectory() {
+  const script =
+    document.querySelector('script[src$="js/game.js"]');
+
+  if (!script) {
+    return null;
   }
 
-  return words
-    .filter(
-      (word) =>
-        typeof word === "string"
-    )
-    .map((word) =>
-      word.trim().toUpperCase()
-    )
-    .filter((word) =>
-      /^[A-Z]+$/.test(word)
-    );
+  return new URL(
+    "./",
+    new URL(script.getAttribute("src"), document.baseURI)
+  );
 }
 
-async function loadDictionary(length) {
-  const path =
-    WORD_DATA_PATHS[length];
+/*
+  Load and validate one dictionary file.
+*/
+async function loadWordCollection(length) {
+  const relativePath =
+    WORD_DATA_FILES[length];
 
-  if (!path) {
+  if (!relativePath) {
     throw new Error(
-      `No dictionary path configured for ${length} letters.`
+      `No dictionary file configured for ${length}-letter words.`
     );
   }
 
-  const response = await fetch(path);
+  const jsDirectory =
+    getJavaScriptDirectory();
+
+  if (!jsDirectory) {
+    throw new Error(
+      "Could not determine the location of game.js."
+    );
+  }
+
+  const fileUrl =
+    new URL(relativePath, jsDirectory);
+
+  let response;
+
+  try {
+    response = await fetch(fileUrl.href, {
+      cache: "no-store"
+    });
+  } catch (error) {
+    throw new Error(
+      `Network error while loading ${fileUrl.pathname}.`
+    );
+  }
 
   if (!response.ok) {
     throw new Error(
-      `Unable to load ${path}: ${response.status} ${response.statusText}`
+      `Could not load ${fileUrl.pathname} — HTTP ${response.status}.`
     );
   }
 
-  const data =
-    await response.json();
+  let data;
 
-  const words =
-    normaliseDictionaryWords(data);
-
-  const correctlySizedWords =
-    words.filter(
-      (word) =>
-        word.length === length
-    );
-
-  if (
-    correctlySizedWords.length === 0
-  ) {
+  try {
+    data = await response.json();
+  } catch (error) {
     throw new Error(
-      `Dictionary ${path} contains no valid ${length}-letter words.`
+      `The file ${fileUrl.pathname} is not valid JSON.`
     );
   }
 
-  return new Set(
-    correctlySizedWords
-  );
+  if (!Array.isArray(data)) {
+    throw new Error(
+      `${fileUrl.pathname} must contain a JSON array of words.`
+    );
+  }
+
+  const words = new Set();
+
+  data.forEach((word) => {
+    if (typeof word !== "string") {
+      return;
+    }
+
+    const normalisedWord =
+      word.trim().toUpperCase();
+
+    if (
+      normalisedWord.length === length &&
+      /^[A-Z]+$/.test(normalisedWord)
+    ) {
+      words.add(normalisedWord);
+    }
+  });
+
+  if (words.size === 0) {
+    throw new Error(
+      `${fileUrl.pathname} loaded successfully but contained no valid ${length}-letter words.`
+    );
+  }
+
+  return words;
 }
 
+/*
+  Load all four dictionaries.
+
+  Each file is loaded separately so that an error can
+  identify the exact dictionary that failed.
+*/
 async function loadDictionaries() {
-  const results =
-    await Promise.all(
-      SUPPORTED_WORD_LENGTHS.map(
-        async (length) => {
-          const dictionary =
-            await loadDictionary(length);
+  showMessage(
+    "Stage 16: Loading dictionary…"
+  );
 
-          return [
-            length,
-            dictionary
-          ];
-        }
-      )
-    );
+  for (const length of SUPPORTED_WORD_LENGTHS) {
+    try {
+      const words =
+        await loadWordCollection(length);
 
-  dictionaries =
-    Object.fromEntries(results);
+      wordCollections[length] = words;
+
+      console.log(
+        `Loaded ${words.size} ${length}-letter words.`
+      );
+    } catch (error) {
+      console.error(
+        `Dictionary loading failed for ${length}-letter words:`,
+        error
+      );
+
+      showMessage(
+        `Dictionary error: ${error.message}`
+      );
+
+      dictionariesLoaded = false;
+
+      return false;
+    }
+  }
 
   dictionariesLoaded = true;
+
+  console.log(
+    "All Stage 16 dictionaries loaded successfully."
+  );
+
+  return true;
 }
 
-function handleDictionaryLoadFailure(
-  error
-) {
-  console.error(
-    "Stage 16 dictionary loading failed:",
-    error
+/* ------------------------------
+   Word-length helpers
+   ------------------------------ */
+
+function isSupportedWordLength(length) {
+  return SUPPORTED_WORD_LENGTHS.includes(length);
+}
+
+function getWordLengthWords() {
+  return (
+    wordCollections[WORD_LENGTH] ||
+    new Set()
   );
+}
 
-  dictionaryLoadFailed = true;
+function getRandomWordLength() {
+  const randomIndex =
+    Math.floor(
+      Math.random() *
+      SUPPORTED_WORD_LENGTHS.length
+    );
 
-  showMessage(
-    "Unable to load the word dictionary. Please reload the page."
+  return SUPPORTED_WORD_LENGTHS[randomIndex];
+}
+
+function isRandomWordLengthSelected() {
+  return (
+    wordLengthSelect &&
+    wordLengthSelect.value === RANDOM_WORD_LENGTH
   );
-
-  if (wordLengthSelect) {
-    wordLengthSelect.disabled = true;
-  }
-
-  if (newGameButton) {
-    newGameButton.disabled = true;
-  }
 }
 
 /* ------------------------------
@@ -228,9 +311,7 @@ function handleDictionaryLoadFailure(
 
 function getRandomTargetWord() {
   const words =
-    Array.from(
-      getWordLengthWords()
-    );
+    Array.from(getWordLengthWords());
 
   if (words.length === 0) {
     return "";
@@ -238,8 +319,7 @@ function getRandomTargetWord() {
 
   const randomIndex =
     Math.floor(
-      Math.random() *
-        words.length
+      Math.random() * words.length
     );
 
   return words[randomIndex];
@@ -248,6 +328,16 @@ function getRandomTargetWord() {
 function selectRandomTarget() {
   targetWord =
     getRandomTargetWord();
+
+  if (!targetWord) {
+    throw new Error(
+      `No target words are available for ${WORD_LENGTH}-letter games.`
+    );
+  }
+
+  console.log(
+    `Selected ${WORD_LENGTH}-letter target: ${targetWord}`
+  );
 }
 
 /* ------------------------------
@@ -256,9 +346,7 @@ function selectRandomTarget() {
 
 function updateInstructions() {
   const instructions =
-    document.querySelector(
-      ".instructions"
-    );
+    document.querySelector(".instructions");
 
   if (!instructions) {
     return;
@@ -285,9 +373,7 @@ function createBoard() {
     rowIndex += 1
   ) {
     const row =
-      document.createElement(
-        "div"
-      );
+      document.createElement("div");
 
     row.className = "row";
 
@@ -307,9 +393,7 @@ function createBoard() {
       tileIndex += 1
     ) {
       const tile =
-        document.createElement(
-          "div"
-        );
+        document.createElement("div");
 
       tile.className = "tile";
 
@@ -326,9 +410,7 @@ function createBoard() {
 
   rows =
     Array.from(
-      board.querySelectorAll(
-        ".row"
-      )
+      board.querySelectorAll(".row")
     );
 }
 
@@ -337,20 +419,18 @@ function createBoard() {
    ------------------------------ */
 
 function initialiseGame() {
-  if (
-    !dictionariesLoaded ||
-    dictionaryLoadFailed
-  ) {
+  if (!dictionariesLoaded) {
+    showMessage(
+      "Dictionary has not finished loading."
+    );
+
     return;
   }
 
   /*
-    Random mode selects a new supported
-    length whenever a new game begins.
+    Determine the word length for this game.
   */
-  if (
-    isRandomWordLengthSelected()
-  ) {
+  if (isRandomWordLengthSelected()) {
     WORD_LENGTH =
       getRandomWordLength();
   } else {
@@ -372,29 +452,22 @@ function initialiseGame() {
 
       if (wordLengthSelect) {
         wordLengthSelect.value =
-          String(
-            DEFAULT_WORD_LENGTH
-          );
+          String(DEFAULT_WORD_LENGTH);
       }
     }
   }
 
   /*
-    Every new game gets a new
-    random target from the selected
-    length's dictionary.
+    Select a fresh random target.
   */
   selectRandomTarget();
 
-  if (!targetWord) {
-    showMessage(
-      `No playable ${WORD_LENGTH}-letter words are available.`
-    );
-
-    return;
-  }
-
+  /*
+    Create the board only after the
+    dictionary and target are ready.
+  */
   createBoard();
+
   updateInstructions();
 
   currentRow = 0;
@@ -491,8 +564,7 @@ function addLetter(letter) {
   const upperLetter =
     letter.toUpperCase();
 
-  tiles[currentTile]
-    .textContent =
+  tiles[currentTile].textContent =
     upperLetter;
 
   updateTileInputLabel(
@@ -519,14 +591,11 @@ function removeLetter() {
     getCurrentRowTiles();
 
   if (tiles[currentTile]) {
-    tiles[currentTile]
-      .textContent = "";
+    tiles[currentTile].textContent =
+      "";
 
     tiles[currentTile]
-      .setAttribute(
-        "aria-label",
-        `Guess ${currentRow + 1}, position ${currentTile + 1}: empty`
-      );
+      .removeAttribute("aria-label");
   }
 }
 
@@ -566,15 +635,14 @@ function evaluateGuess(guess) {
       results[index] =
         "correct";
 
-      remainingTargetLetters[
-        index
-      ] = null;
+      remainingTargetLetters[index] =
+        null;
     }
   }
 
   /*
     Second pass:
-    wrong-position matches.
+    present but incorrectly positioned.
   */
   for (
     let index = 0;
@@ -589,10 +657,9 @@ function evaluateGuess(guess) {
     }
 
     const matchingIndex =
-      remainingTargetLetters
-        .indexOf(
-          guess[index]
-        );
+      remainingTargetLetters.indexOf(
+        guess[index]
+      );
 
     if (
       matchingIndex !== -1
@@ -609,18 +676,12 @@ function evaluateGuess(guess) {
   return results;
 }
 
-function getResultDescription(
-  result
-) {
-  if (
-    result === "correct"
-  ) {
+function getResultDescription(result) {
+  if (result === "correct") {
     return "correct position";
   }
 
-  if (
-    result === "present"
-  ) {
+  if (result === "present") {
     return "correct letter, wrong position";
   }
 
@@ -638,9 +699,7 @@ function displayEvaluation(
   const tiles =
     Array.from(
       rows[rowIndex]
-        .querySelectorAll(
-          ".tile"
-        )
+        .querySelectorAll(".tile")
     ).slice(
       0,
       WORD_LENGTH
@@ -698,11 +757,7 @@ function endGame(won) {
    ------------------------------ */
 
 function submitGuess() {
-  if (
-    gameOver ||
-    !dictionariesLoaded ||
-    dictionaryLoadFailed
-  ) {
+  if (gameOver) {
     return;
   }
 
@@ -743,9 +798,7 @@ function submitGuess() {
   }
 
   const results =
-    evaluateGuess(
-      guess
-    );
+    evaluateGuess(guess);
 
   displayEvaluation(
     results,
@@ -780,13 +833,6 @@ function submitGuess() {
    ------------------------------ */
 
 function startNewGame() {
-  if (
-    !dictionariesLoaded ||
-    dictionaryLoadFailed
-  ) {
-    return;
-  }
-
   initialiseGame();
 }
 
@@ -795,11 +841,7 @@ function startNewGame() {
    ------------------------------ */
 
 function handleWordLengthChange() {
-  if (
-    !wordLengthSelect ||
-    !dictionariesLoaded ||
-    dictionaryLoadFailed
-  ) {
+  if (!wordLengthSelect) {
     return;
   }
 
@@ -823,9 +865,7 @@ function handleWordLengthChange() {
     )
   ) {
     wordLengthSelect.value =
-      String(
-        DEFAULT_WORD_LENGTH
-      );
+      String(DEFAULT_WORD_LENGTH);
 
     WORD_LENGTH =
       DEFAULT_WORD_LENGTH;
@@ -879,8 +919,7 @@ document.addEventListener(
     }
 
     if (
-      event.key ===
-      "Backspace"
+      event.key === "Backspace"
     ) {
       event.preventDefault();
 
@@ -963,31 +1002,22 @@ if (newGameButton) {
    Application startup
    ------------------------------ */
 
+/*
+  Stage 16 now starts by loading the
+  dictionaries.
+
+  The board is not created until all
+  dictionaries have loaded successfully.
+*/
 async function startApplication() {
-  showMessage(
-    "Loading word dictionary…"
-  );
-
-  if (wordLengthSelect) {
-    wordLengthSelect.disabled =
-      true;
-  }
-
-  try {
+  const loaded =
     await loadDictionaries();
 
-    if (wordLengthSelect) {
-      wordLengthSelect.disabled =
-        false;
-    }
-
-    initialiseGame();
-  } catch (error) {
-    handleDictionaryLoadFailure(
-      error
-    );
+  if (!loaded) {
+    return;
   }
+
+  initialiseGame();
 }
 
 startApplication();
-```
