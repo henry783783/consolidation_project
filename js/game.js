@@ -21,103 +21,63 @@
   Supported lengths:
   4, 5, 6 and 7 letters.
 
-  Stage 17 uses two sets of JSON files:
-
   Guess dictionaries:
     data/words-4.json
     data/words-5.json
     data/words-6.json
     data/words-7.json
 
-  Curated target dictionaries:
+  Target dictionaries:
     data/targets-4.json
     data/targets-5.json
     data/targets-6.json
     data/targets-7.json
 
-  Guess dictionaries determine which guesses are accepted.
-
-  Target dictionaries determine which words can actually
-  be selected as the answer.
+  Stage 17:
+  - Any valid word in words-*.json may be submitted as a guess.
+  - Only words in targets-*.json may be selected as targets.
 */
 
 "use strict";
 
-/* ------------------------------
+/* =========================================================
    Game constants
-   ------------------------------ */
+   ========================================================= */
 
-const SUPPORTED_WORD_LENGTHS = [4, 5, 6, 7];
+const SUPPORTED_WORD_LENGTHS = [
+  4,
+  5,
+  6,
+  7
+];
+
 const DEFAULT_WORD_LENGTH = 5;
 const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
-/*
-  Capture the actual URL of this game.js file while the
-  script is executing.
-
-  This is deliberately done here rather than trying to
-  reconstruct the script location later.
-
-  On GitHub Pages, if game.js is:
-
-    /consolidation_project/js/game.js
-
-  then:
-
-    ../data/words-5.json
-
-  correctly resolves to:
-
-    /consolidation_project/data/words-5.json
-*/
-const GAME_SCRIPT_URL =
-  document.currentScript
-    ? document.currentScript.src
-    : new URL(
-        "js/game.js",
-        document.baseURI
-      ).href;
+/* =========================================================
+   DOM elements
+   ========================================================= */
 
 /*
-  Dictionary filenames.
+  These are deliberately assigned inside startApplication()
+  rather than immediately when the script is parsed.
 
-  These paths are resolved relative to the actual
-  game.js file URL above.
+  This makes the game safe whether game.js is loaded:
+  - in <head>
+  - at the end of <body>
+  - with defer
+  - or without defer
 */
-const WORD_DATA_FILES = {
-  4: "../data/words-4.json",
-  5: "../data/words-5.json",
-  6: "../data/words-6.json",
-  7: "../data/words-7.json"
-};
 
-const TARGET_DATA_FILES = {
-  4: "../data/targets-4.json",
-  5: "../data/targets-5.json",
-  6: "../data/targets-6.json",
-  7: "../data/targets-7.json"
-};
+let board = null;
+let statusMessage = null;
+let newGameButton = null;
+let wordLengthSelect = null;
 
-/* ------------------------------
-   Page elements
-   ------------------------------ */
-
-const board =
-  document.querySelector(".board");
-
-const statusMessage =
-  document.querySelector(".stage-status");
-
-const newGameButton =
-  document.querySelector("#new-game");
-
-const wordLengthSelect =
-  document.querySelector("#word-length");
-
-/* ------------------------------
+/* =========================================================
    Game state
-   ------------------------------ */
+   ========================================================= */
 
 let WORD_LENGTH =
   DEFAULT_WORD_LENGTH;
@@ -129,11 +89,12 @@ let currentRow = 0;
 let currentTile = 0;
 let gameOver = false;
 
-/*
-  Guess dictionaries.
+/* =========================================================
+   Dictionary state
+   ========================================================= */
 
-  These contain all words that the player is allowed
-  to submit as guesses.
+/*
+  General guess dictionaries.
 */
 const wordCollections = {
   4: new Set(),
@@ -143,10 +104,7 @@ const wordCollections = {
 };
 
 /*
-  Target dictionaries.
-
-  These contain only the curated words that may be
-  selected as answers.
+  Curated target dictionaries.
 */
 const targetCollections = {
   4: new Set(),
@@ -157,30 +115,50 @@ const targetCollections = {
 
 let dictionariesLoaded = false;
 
-/* ------------------------------
+/* =========================================================
+   Dictionary filenames
+   ========================================================= */
+
+const WORD_DATA_FILES = {
+  4: "words-4.json",
+  5: "words-5.json",
+  6: "words-6.json",
+  7: "words-7.json"
+};
+
+const TARGET_DATA_FILES = {
+  4: "targets-4.json",
+  5: "targets-5.json",
+  6: "targets-6.json",
+  7: "targets-7.json"
+};
+
+/* =========================================================
    Status helpers
-   ------------------------------ */
+   ========================================================= */
 
 function showMessage(message) {
   if (statusMessage) {
     statusMessage.textContent =
       message;
   }
+
+  console.log(
+    `[Wordle] ${message}`
+  );
 }
 
-/* ------------------------------
+/* =========================================================
    Randomness
-   ------------------------------ */
+   ========================================================= */
 
 /*
-  Return a cryptographically stronger random integer.
+  Return a random integer from 0 up to length - 1.
 
-  crypto.getRandomValues() is preferable to Math.random()
-  for selecting the initial target because separate users
-  loading the page at roughly the same time should not
-  receive the same deterministic-looking sequence.
+  crypto.getRandomValues() is used when available.
 
-  Math.random() remains as a compatibility fallback.
+  This avoids relying exclusively on Math.random()
+  when selecting target words for newly loaded games.
 */
 function getSecureRandomIndex(length) {
   if (length <= 0) {
@@ -195,33 +173,22 @@ function getSecureRandomIndex(length) {
     const randomValues =
       new Uint32Array(1);
 
-    window.crypto.getRandomValues(
-      randomValues
-    );
-
-    /*
-      Rejection sampling avoids introducing a small
-      modulo bias when the collection size does not
-      divide evenly into the uint32 range.
-    */
     const maximum =
       Math.floor(
         0x100000000 / length
       ) * length;
 
-    let randomValue =
-      randomValues[0];
-
-    while (randomValue >= maximum) {
+    do {
       window.crypto.getRandomValues(
         randomValues
       );
+    } while (
+      randomValues[0] >= maximum
+    );
 
-      randomValue =
-        randomValues[0];
-    }
-
-    return randomValue % length;
+    return (
+      randomValues[0] % length
+    );
   }
 
   return Math.floor(
@@ -229,403 +196,45 @@ function getSecureRandomIndex(length) {
   );
 }
 
-/* ------------------------------
-   Dictionary URL helpers
-   ------------------------------ */
+/* =========================================================
+   URL helpers
+   ========================================================= */
 
 /*
-  Build a JSON URL relative to the actual game.js file.
+  Resolve a data filename from the current page URL.
 
-  This is the important Stage 16/17 loading fix.
+  Your GitHub Pages page is effectively:
 
-  It does not depend on:
-  - the current page URL
-  - the GitHub Pages repository name
-  - a hard-coded domain
-  - the browser's current directory
+    /consolidation_project/
+
+  Therefore:
+
+    data/words-5.json
+
+  becomes:
+
+    /consolidation_project/data/words-5.json
+
+  We deliberately use document.baseURI here rather than
+  trying to infer the location of game.js.
 */
-function getDataFileUrl(relativePath) {
-  if (!GAME_SCRIPT_URL) {
-    throw new Error(
-      "Could not determine the location of game.js."
-    );
-  }
-
+function getDataFileUrl(filename) {
   return new URL(
-    relativePath,
-    GAME_SCRIPT_URL
+    `data/${filename}`,
+    document.baseURI
   );
 }
 
-/* ------------------------------
-   Dictionary loading
-   ------------------------------ */
-
-/*
-  Load and validate one JSON word collection.
-
-  The same loader is used for both:
-  - the full guess dictionary
-  - the curated target dictionary
-*/
-async function loadWordCollection(
-  length,
-  relativePath,
-  collectionType
-) {
-  if (!relativePath) {
-    throw new Error(
-      `No ${collectionType} file configured for ${length}-letter words.`
-    );
-  }
-
-  let fileUrl;
-
-  try {
-    fileUrl =
-      getDataFileUrl(relativePath);
-  } catch (error) {
-    throw new Error(
-      `Could not determine the URL for the ${collectionType} dictionary.`
-    );
-  }
-
-  let response;
-
-  try {
-    response = await fetch(
-      fileUrl.href,
-      {
-        cache: "no-store"
-      }
-    );
-  } catch (error) {
-    throw new Error(
-      `Network error while loading ${fileUrl.pathname}.`
-    );
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Could not load ${fileUrl.pathname} — HTTP ${response.status}.`
-    );
-  }
-
-  let data;
-
-  try {
-    data = await response.json();
-  } catch (error) {
-    throw new Error(
-      `The file ${fileUrl.pathname} is not valid JSON.`
-    );
-  }
-
-  if (!Array.isArray(data)) {
-    throw new Error(
-      `${fileUrl.pathname} must contain a JSON array of words.`
-    );
-  }
-
-  const words =
-    new Set();
-
-  data.forEach((word) => {
-    if (
-      typeof word !== "string"
-    ) {
-      return;
-    }
-
-    const normalisedWord =
-      word
-        .trim()
-        .toUpperCase();
-
-    if (
-      normalisedWord.length ===
-        length &&
-      /^[A-Z]+$/.test(
-        normalisedWord
-      )
-    ) {
-      words.add(
-        normalisedWord
-      );
-    }
-  });
-
-  if (words.size === 0) {
-    throw new Error(
-      `${fileUrl.pathname} loaded successfully but contained no valid ${length}-letter words.`
-    );
-  }
-
-  return words;
-}
-
-/*
-  Load all guess dictionaries and all target dictionaries.
-
-  Each file is loaded separately so that any failure
-  identifies the exact file involved.
-*/
-async function loadDictionaries() {
-  showMessage(
-    "Stage 17: Loading dictionaries…"
-  );
-
-  /*
-    Load the general guess dictionaries.
-  */
-  for (
-    const length of
-      SUPPORTED_WORD_LENGTHS
-  ) {
-    try {
-      const words =
-        await loadWordCollection(
-          length,
-          WORD_DATA_FILES[length],
-          "guess"
-        );
-
-      wordCollections[length] =
-        words;
-
-      console.log(
-        `Loaded ${words.size} valid guess words for ${length}-letter games.`
-      );
-    } catch (error) {
-      console.error(
-        `Guess dictionary loading failed for ${length}-letter words:`,
-        error
-      );
-
-      showMessage(
-        `Dictionary error: ${error.message}`
-      );
-
-      dictionariesLoaded =
-        false;
-
-      return false;
-    }
-  }
-
-  /*
-    Load the curated target dictionaries.
-  */
-  for (
-    const length of
-      SUPPORTED_WORD_LENGTHS
-  ) {
-    try {
-      const targets =
-        await loadWordCollection(
-          length,
-          TARGET_DATA_FILES[length],
-          "target"
-        );
-
-      targetCollections[length] =
-        targets;
-
-      console.log(
-        `Loaded ${targets.size} curated target words for ${length}-letter games.`
-      );
-    } catch (error) {
-      console.error(
-        `Target dictionary loading failed for ${length}-letter words:`,
-        error
-      );
-
-      showMessage(
-        `Target dictionary error: ${error.message}`
-      );
-
-      dictionariesLoaded =
-        false;
-
-      return false;
-    }
-  }
-
-  /*
-    Final safety check:
-    every target must also be an accepted guess.
-
-    This prevents a target file from accidentally
-    containing a word that the player could never
-    submit successfully.
-  */
-  for (
-    const length of
-      SUPPORTED_WORD_LENGTHS
-  ) {
-    const guesses =
-      wordCollections[length];
-
-    const targets =
-      targetCollections[length];
-
-    const invalidTargets =
-      Array.from(
-        targets
-      ).filter(
-        (target) =>
-          !guesses.has(target)
-      );
-
-    if (
-      invalidTargets.length > 0
-    ) {
-      console.error(
-        `Target validation failed for ${length}-letter words:`,
-        invalidTargets
-      );
-
-      showMessage(
-        `Target dictionary error: ${invalidTargets.length} target word(s) are missing from the guess dictionary.`
-      );
-
-      dictionariesLoaded =
-        false;
-
-      return false;
-    }
-  }
-
-  dictionariesLoaded =
-    true;
-
-  console.log(
-    "All Stage 17 guess and target dictionaries loaded successfully."
-  );
-
-  return true;
-}
-
-/* ------------------------------
-   Word-length helpers
-   ------------------------------ */
-
-function isSupportedWordLength(
-  length
-) {
-  return SUPPORTED_WORD_LENGTHS.includes(
-    length
-  );
-}
-
-function getWordLengthWords() {
-  return (
-    wordCollections[
-      WORD_LENGTH
-    ] ||
-    new Set()
-  );
-}
-
-function getTargetWords() {
-  return (
-    targetCollections[
-      WORD_LENGTH
-    ] ||
-    new Set()
-  );
-}
-
-function getRandomWordLength() {
-  const randomIndex =
-    getSecureRandomIndex(
-      SUPPORTED_WORD_LENGTHS.length
-    );
-
-  return SUPPORTED_WORD_LENGTHS[
-    randomIndex
-  ];
-}
-
-function isRandomWordLengthSelected() {
-  return (
-    wordLengthSelect &&
-    wordLengthSelect.value ===
-      RANDOM_WORD_LENGTH
-  );
-}
-
-/* ------------------------------
-   Target-word helpers
-   ------------------------------ */
-
-function getRandomTargetWord() {
-  const words =
-    Array.from(
-      getTargetWords()
-    );
-
-  if (
-    words.length === 0
-  ) {
-    return "";
-  }
-
-  const randomIndex =
-    getSecureRandomIndex(
-      words.length
-    );
-
-  if (
-    randomIndex < 0
-  ) {
-    return "";
-  }
-
-  return words[
-    randomIndex
-  ];
-}
-
-function selectRandomTarget() {
-  targetWord =
-    getRandomTargetWord();
-
-  if (!targetWord) {
-    throw new Error(
-      `No target words are available for ${WORD_LENGTH}-letter games.`
-    );
-  }
-
-  console.log(
-    `Selected ${WORD_LENGTH}-letter target: ${targetWord}`
-  );
-}
-
-/* ------------------------------
-   Instructions
-   ------------------------------ */
-
-function updateInstructions() {
-  const instructions =
-    document.querySelector(
-      ".instructions"
-    );
-
-  if (!instructions) {
-    return;
-  }
-
-  instructions.textContent =
-    `Guess the ${WORD_LENGTH}-letter word in six tries.`;
-}
-
-/* ------------------------------
+/* =========================================================
    Board creation
-   ------------------------------ */
+   ========================================================= */
 
 function createBoard() {
   if (!board) {
+    console.error(
+      "Board element .board was not found."
+    );
+
     return;
   }
 
@@ -688,14 +297,404 @@ function createBoard() {
         ".row"
       )
     );
+
+  console.log(
+    `Board created: ${MAX_GUESSES} rows × ${WORD_LENGTH} tiles.`
+  );
 }
 
-/* ------------------------------
+/* =========================================================
+   Dictionary loading
+   ========================================================= */
+
+/*
+  Load one JSON file.
+
+  The function gives very explicit diagnostics so that
+  future loading problems can be identified immediately.
+*/
+async function loadWordCollection(
+  length,
+  filename,
+  collectionType
+) {
+  const fileUrl =
+    getDataFileUrl(
+      filename
+    );
+
+  console.log(
+    `Loading ${collectionType} dictionary:`,
+    fileUrl.href
+  );
+
+  let response;
+
+  try {
+    response =
+      await fetch(
+        fileUrl.href,
+        {
+          cache: "no-store"
+        }
+      );
+  } catch (error) {
+    throw new Error(
+      `Network error loading ${fileUrl.href}`
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status} while loading ${fileUrl.href}`
+    );
+  }
+
+  let data;
+
+  try {
+    data =
+      await response.json();
+  } catch (error) {
+    throw new Error(
+      `${fileUrl.href} did not contain valid JSON.`
+    );
+  }
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      `${fileUrl.href} must contain a JSON array.`
+    );
+  }
+
+  const words =
+    new Set();
+
+  data.forEach(
+    (word) => {
+      if (
+        typeof word !==
+        "string"
+      ) {
+        return;
+      }
+
+      const normalisedWord =
+        word
+          .trim()
+          .toUpperCase();
+
+      if (
+        normalisedWord.length ===
+          length &&
+        /^[A-Z]+$/.test(
+          normalisedWord
+        )
+      ) {
+        words.add(
+          normalisedWord
+        );
+      }
+    }
+  );
+
+  if (
+    words.size === 0
+  ) {
+    throw new Error(
+      `${fileUrl.href} loaded but contained no valid ${length}-letter words.`
+    );
+  }
+
+  console.log(
+    `Loaded ${words.size} ${collectionType} words from ${fileUrl.href}`
+  );
+
+  return words;
+}
+
+/*
+  Load all eight JSON files.
+
+  Four are general guess dictionaries.
+  Four are curated target dictionaries.
+*/
+async function loadDictionaries() {
+  showMessage(
+    "Stage 17: Loading dictionaries…"
+  );
+
+  /*
+    -------------------------------
+    Load guess dictionaries
+    -------------------------------
+  */
+
+  for (
+    const length of
+      SUPPORTED_WORD_LENGTHS
+  ) {
+    const filename =
+      WORD_DATA_FILES[
+        length
+      ];
+
+    try {
+      const words =
+        await loadWordCollection(
+          length,
+          filename,
+          "guess"
+        );
+
+      wordCollections[
+        length
+      ] = words;
+    } catch (error) {
+      console.error(
+        `Guess dictionary failed for ${length}-letter words:`,
+        error
+      );
+
+      showMessage(
+        `Guess dictionary error: ${error.message}`
+      );
+
+      dictionariesLoaded =
+        false;
+
+      return false;
+    }
+  }
+
+  /*
+    -------------------------------
+    Load target dictionaries
+    -------------------------------
+  */
+
+  for (
+    const length of
+      SUPPORTED_WORD_LENGTHS
+  ) {
+    const filename =
+      TARGET_DATA_FILES[
+        length
+      ];
+
+    try {
+      const targets =
+        await loadWordCollection(
+          length,
+          filename,
+          "target"
+        );
+
+      targetCollections[
+        length
+      ] = targets;
+    } catch (error) {
+      console.error(
+        `Target dictionary failed for ${length}-letter words:`,
+        error
+      );
+
+      showMessage(
+        `Target dictionary error: ${error.message}`
+      );
+
+      dictionariesLoaded =
+        false;
+
+      return false;
+    }
+  }
+
+  /*
+    -------------------------------
+    Validate target membership
+    -------------------------------
+
+    Every target should also exist
+    in the corresponding guess list.
+
+    Otherwise the game could select
+    an answer that the player could
+    never submit.
+  */
+
+  for (
+    const length of
+      SUPPORTED_WORD_LENGTHS
+  ) {
+    const guesses =
+      wordCollections[
+        length
+      ];
+
+    const targets =
+      targetCollections[
+        length
+      ];
+
+    const invalidTargets =
+      Array.from(
+        targets
+      ).filter(
+        (target) =>
+          !guesses.has(
+            target
+          )
+      );
+
+    if (
+      invalidTargets.length >
+      0
+    ) {
+      console.error(
+        `Invalid targets for ${length}-letter games:`,
+        invalidTargets
+      );
+
+      showMessage(
+        `Target dictionary error: ${invalidTargets.length} target word(s) are not in the guess dictionary.`
+      );
+
+      dictionariesLoaded =
+        false;
+
+      return false;
+    }
+  }
+
+  dictionariesLoaded =
+    true;
+
+  console.log(
+    "All Stage 17 dictionaries loaded successfully."
+  );
+
+  return true;
+}
+
+/* =========================================================
+   Word-length helpers
+   ========================================================= */
+
+function isSupportedWordLength(
+  length
+) {
+  return SUPPORTED_WORD_LENGTHS.includes(
+    length
+  );
+}
+
+function getWordLengthWords() {
+  return (
+    wordCollections[
+      WORD_LENGTH
+    ] ||
+    new Set()
+  );
+}
+
+function getTargetWords() {
+  return (
+    targetCollections[
+      WORD_LENGTH
+    ] ||
+    new Set()
+  );
+}
+
+function getRandomWordLength() {
+  const index =
+    getSecureRandomIndex(
+      SUPPORTED_WORD_LENGTHS.length
+    );
+
+  return (
+    SUPPORTED_WORD_LENGTHS[
+      index
+    ]
+  );
+}
+
+function isRandomWordLengthSelected() {
+  return (
+    wordLengthSelect &&
+    wordLengthSelect.value ===
+      RANDOM_WORD_LENGTH
+  );
+}
+
+/* =========================================================
+   Target selection
+   ========================================================= */
+
+function getRandomTargetWord() {
+  const words =
+    Array.from(
+      getTargetWords()
+    );
+
+  if (
+    words.length === 0
+  ) {
+    return "";
+  }
+
+  const randomIndex =
+    getSecureRandomIndex(
+      words.length
+    );
+
+  return words[
+    randomIndex
+  ];
+}
+
+function selectRandomTarget() {
+  targetWord =
+    getRandomTargetWord();
+
+  if (!targetWord) {
+    throw new Error(
+      `No target words are available for ${WORD_LENGTH}-letter games.`
+    );
+  }
+
+  console.log(
+    `Selected ${WORD_LENGTH}-letter target: ${targetWord}`
+  );
+}
+
+/* =========================================================
+   Instructions
+   ========================================================= */
+
+function updateInstructions() {
+  const instructions =
+    document.querySelector(
+      ".instructions"
+    );
+
+  if (!instructions) {
+    return;
+  }
+
+  instructions.textContent =
+    `Guess the ${WORD_LENGTH}-letter word in six tries.`;
+}
+
+/* =========================================================
    Game initialisation
-   ------------------------------ */
+   ========================================================= */
 
 function initialiseGame() {
-  if (!dictionariesLoaded) {
+  if (
+    !dictionariesLoaded
+  ) {
     showMessage(
       "Dictionaries have not finished loading."
     );
@@ -704,9 +703,9 @@ function initialiseGame() {
   }
 
   /*
-    Determine the word length for
-    this game.
+    Determine word length.
   */
+
   if (
     isRandomWordLengthSelected()
   ) {
@@ -743,16 +742,15 @@ function initialiseGame() {
   }
 
   /*
-    Stage 17:
-    Select the target only from the
-    curated target collection.
+    Select from curated targets.
   */
+
   selectRandomTarget();
 
   /*
-    Create the board only after the
-    dictionaries and target are ready.
+    Build the board.
   */
+
   createBoard();
 
   updateInstructions();
@@ -773,15 +771,17 @@ function initialiseGame() {
     );
   }
 
-  if (newGameButton) {
+  if (
+    newGameButton
+  ) {
     newGameButton.hidden =
       true;
   }
 }
 
-/* ------------------------------
+/* =========================================================
    Board helpers
-   ------------------------------ */
+   ========================================================= */
 
 function getCurrentRowTiles() {
   if (
@@ -835,9 +835,9 @@ function updateTileInputLabel(
   );
 }
 
-/* ------------------------------
+/* =========================================================
    Letter input
-   ------------------------------ */
+   ========================================================= */
 
 function addLetter(letter) {
   if (
@@ -908,13 +908,15 @@ function handleLetter(
       letter
     )
   ) {
-    addLetter(letter);
+    addLetter(
+      letter
+    );
   }
 }
 
-/* ------------------------------
+/* =========================================================
    Guess evaluation
-   ------------------------------ */
+   ========================================================= */
 
 function evaluateGuess(
   guess
@@ -933,6 +935,7 @@ function evaluateGuess(
     First pass:
     exact matches.
   */
+
   for (
     let index = 0;
     index < WORD_LENGTH;
@@ -953,8 +956,9 @@ function evaluateGuess(
 
   /*
     Second pass:
-    present but incorrectly positioned.
+    present but wrong position.
   */
+
   for (
     let index = 0;
     index < WORD_LENGTH;
@@ -1052,9 +1056,9 @@ function displayEvaluation(
   );
 }
 
-/* ------------------------------
+/* =========================================================
    Win/loss handling
-   ------------------------------ */
+   ========================================================= */
 
 function endGame(
   won
@@ -1079,12 +1083,14 @@ function endGame(
   }
 }
 
-/* ------------------------------
+/* =========================================================
    Guess submission
-   ------------------------------ */
+   ========================================================= */
 
 function submitGuess() {
-  if (gameOver) {
+  if (
+    gameOver
+  ) {
     return;
   }
 
@@ -1114,10 +1120,10 @@ function submitGuess() {
   }
 
   /*
-    Guesses are checked against the
-    comprehensive guess dictionary,
-    not the smaller target collection.
+    A guess only needs to exist in the
+    general dictionary.
   */
+
   if (
     !getWordLengthWords()
       .has(guess)
@@ -1142,7 +1148,10 @@ function submitGuess() {
   if (
     guess === targetWord
   ) {
-    endGame(true);
+    endGame(
+      true
+    );
+
     return;
   }
 
@@ -1150,7 +1159,10 @@ function submitGuess() {
     currentRow ===
     MAX_GUESSES - 1
   ) {
-    endGame(false);
+    endGame(
+      false
+    );
+
     return;
   }
 
@@ -1162,17 +1174,17 @@ function submitGuess() {
   currentTile = 0;
 }
 
-/* ------------------------------
+/* =========================================================
    New game
-   ------------------------------ */
+   ========================================================= */
 
 function startNewGame() {
   initialiseGame();
 }
 
-/* ------------------------------
+/* =========================================================
    Word-length selection
-   ------------------------------ */
+   ========================================================= */
 
 function handleWordLengthChange() {
   if (
@@ -1189,6 +1201,7 @@ function handleWordLengthChange() {
     RANDOM_WORD_LENGTH
   ) {
     initialiseGame();
+
     return;
   }
 
@@ -1217,18 +1230,9 @@ function handleWordLengthChange() {
   initialiseGame();
 }
 
-if (
-  wordLengthSelect
-) {
-  wordLengthSelect.addEventListener(
-    "change",
-    handleWordLengthChange
-  );
-}
-
-/* ------------------------------
+/* =========================================================
    Shared actions
-   ------------------------------ */
+   ========================================================= */
 
 function handleAction(
   action
@@ -1238,6 +1242,7 @@ function handleAction(
     "backspace"
   ) {
     removeLetter();
+
     return;
   }
 
@@ -1249,145 +1254,232 @@ function handleAction(
   }
 }
 
-/* ------------------------------
-   Physical keyboard
-   ------------------------------ */
+/* =========================================================
+   Event handlers
+   ========================================================= */
 
-document.addEventListener(
-  "keydown",
-  (event) => {
-    if (
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey
-    ) {
-      return;
-    }
-
-    if (
-      event.key ===
-      "Backspace"
-    ) {
-      event.preventDefault();
-
-      handleAction(
-        "backspace"
-      );
-
-      return;
-    }
-
-    if (
-      event.key ===
-      "Enter"
-    ) {
-      event.preventDefault();
-
-      handleAction(
-        "enter"
-      );
-
-      return;
-    }
-
-    if (
-      /^[a-zA-Z]$/.test(
-        event.key
-      )
-    ) {
-      event.preventDefault();
-
-      handleLetter(
-        event.key
-      );
-    }
-  }
-);
-
-/* ------------------------------
-   On-screen keyboard
-   ------------------------------ */
-
-document.addEventListener(
-  "click",
-  (event) => {
-    const button =
-      event.target.closest(
-        "button[data-key]"
-      );
-
-    if (!button) {
-      return;
-    }
-
-    const key =
-      button.dataset.key;
-
-    if (
-      key === "enter" ||
-      key === "backspace"
-    ) {
-      handleAction(
-        key
-      );
-
-      return;
-    }
-
-    handleLetter(
-      key
+function setupEventListeners() {
+  if (
+    wordLengthSelect
+  ) {
+    wordLengthSelect.addEventListener(
+      "change",
+      handleWordLengthChange
     );
   }
-);
 
-/* ------------------------------
-   New Game button
-   ------------------------------ */
+  if (
+    newGameButton
+  ) {
+    newGameButton.addEventListener(
+      "click",
+      startNewGame
+    );
+  }
 
-if (
-  newGameButton
-) {
-  newGameButton.addEventListener(
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      if (
+        event.key ===
+        "Backspace"
+      ) {
+        event.preventDefault();
+
+        handleAction(
+          "backspace"
+        );
+
+        return;
+      }
+
+      if (
+        event.key ===
+        "Enter"
+      ) {
+        event.preventDefault();
+
+        handleAction(
+          "enter"
+        );
+
+        return;
+      }
+
+      if (
+        /^[a-zA-Z]$/.test(
+          event.key
+        )
+      ) {
+        event.preventDefault();
+
+        handleLetter(
+          event.key
+        );
+      }
+    }
+  );
+
+  document.addEventListener(
     "click",
-    startNewGame
+    (event) => {
+      const button =
+        event.target.closest(
+          "button[data-key]"
+        );
+
+      if (!button) {
+        return;
+      }
+
+      const key =
+        button.dataset.key;
+
+      if (
+        key === "enter" ||
+        key === "backspace"
+      ) {
+        handleAction(
+          key
+        );
+
+        return;
+      }
+
+      handleLetter(
+        key
+      );
+    }
   );
 }
 
-/* ------------------------------
+/* =========================================================
    Application startup
-   ------------------------------ */
+   ========================================================= */
 
-/*
-  Stage 17 starts by loading all
-  eight JSON collections.
-
-  The board is not created until:
-  1. all guess dictionaries load;
-  2. all target dictionaries load;
-  3. every target is also present
-     in its corresponding guess dictionary.
-*/
 async function startApplication() {
-  try {
-    const loaded =
-      await loadDictionaries();
+  /*
+    First obtain the DOM elements.
 
-    if (!loaded) {
-      return;
-    }
+    This is now guaranteed to happen after
+    DOMContentLoaded.
+  */
 
-    initialiseGame();
-  } catch (error) {
+  board =
+    document.querySelector(
+      ".board"
+    );
+
+  statusMessage =
+    document.querySelector(
+      ".stage-status"
+    );
+
+  newGameButton =
+    document.querySelector(
+      "#new-game"
+    );
+
+  wordLengthSelect =
+    document.querySelector(
+      "#word-length"
+    );
+
+  console.log(
+    "Stage 17 application starting."
+  );
+
+  console.log(
+    "Page URL:",
+    document.baseURI
+  );
+
+  console.log(
+    "Board element:",
+    board
+  );
+
+  /*
+    If the board itself cannot be found,
+    report that explicitly.
+  */
+
+  if (!board) {
     console.error(
-      "Stage 17 application startup failed:",
-      error
+      "Could not find .board in the HTML."
     );
 
     showMessage(
-      `Startup error: ${error.message}`
+      "Page error: .board element not found."
     );
+
+    return;
   }
+
+  /*
+    Build an initial board immediately.
+
+    This means dictionary loading can no
+    longer cause a completely blank board.
+  */
+
+  createBoard();
+
+  /*
+    Wire up user interaction.
+  */
+
+  setupEventListeners();
+
+  /*
+    Load dictionaries.
+  */
+
+  const loaded =
+    await loadDictionaries();
+
+  if (!loaded) {
+    /*
+      The board remains visible so the
+      exact dictionary error can be seen.
+    */
+
+    return;
+  }
+
+  /*
+    Everything is ready.
+  */
+
+  initialiseGame();
 }
 
-startApplication();
+/*
+  Always wait for the document to be ready.
+
+  This protects the game regardless of
+  where the script tag appears in index.html.
+*/
+if (
+  document.readyState ===
+  "loading"
+) {
+  document.addEventListener(
+    "DOMContentLoaded",
+    startApplication,
+    {
+      once: true
+    }
+  );
+} else {
+  startApplication();
+}
 ```
