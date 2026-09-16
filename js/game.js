@@ -1,13 +1,14 @@
 /*
   Wordle-style game
-  Stage 17: Separate target-word lists
+  Stage 17: Try Lazy-loading game data
 
   This file controls:
   - Fixed and random word-length selection.
-  - Random target selection from dedicated target lists.
-  - Dictionary loading from JSON files.
-  - Target-list loading from JSON files.
-  - Dynamic board creation.
+  - Lazy loading of only the selected word length.
+  - Browser-cache-friendly JSON loading.
+  - Target-list validation.
+  - Immediate board creation before data loading.
+  - Responsive board sizing.
   - Physical keyboard input.
   - On-screen keyboard input.
   - Backspace.
@@ -38,20 +39,25 @@
       ├── targets-6.json
       └── targets-7.json
 
-  Stage 17 distinction:
+  Stage 18 data model:
 
   words-X.json
     = words that may be entered as guesses.
 
   targets-X.json
     = words that may be selected as answers.
+
+  Important performance change:
+
+  Only the currently selected word length is loaded.
+  The board is created before any JSON request begins.
 */
 
 "use strict";
 
-/* ------------------------------
+/* --------------------------------
    Game constants
-   ------------------------------ */
+   -------------------------------- */
 
 const SUPPORTED_WORD_LENGTHS = [
   4,
@@ -64,21 +70,9 @@ const DEFAULT_WORD_LENGTH = 5;
 const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
-/*
-  These paths are relative to index.html.
+const BOARD_MAX_TILE_SIZE = 62;
+const BOARD_GAP_FALLBACK = 5;
 
-  GitHub Pages:
-
-  https://henry783783.github.io/consolidation_project/
-
-  therefore:
-
-  ./data/words-4.json
-
-  resolves to:
-
-  /consolidation_project/data/words-4.json
-*/
 const WORD_DATA_FILES = {
   4: "./data/words-4.json",
   5: "./data/words-5.json",
@@ -93,14 +87,19 @@ const TARGET_DATA_FILES = {
   7: "./data/targets-7.json"
 };
 
-/* ------------------------------
-   Game state
-   ------------------------------ */
+/* --------------------------------
+   Page elements
+   -------------------------------- */
 
 let board = null;
 let statusMessage = null;
 let newGameButton = null;
 let wordLengthSelect = null;
+let instructions = null;
+
+/* --------------------------------
+   Game state
+   -------------------------------- */
 
 let WORD_LENGTH = DEFAULT_WORD_LENGTH;
 let targetWord = "";
@@ -108,52 +107,73 @@ let targetWord = "";
 let rows = [];
 let currentRow = 0;
 let currentTile = 0;
+
 let gameOver = false;
+let gameReady = false;
+let dataLoading = false;
 
-const wordCollections = {
-  4: new Set(),
-  5: new Set(),
-  6: new Set(),
-  7: new Set()
-};
+/*
+  Every time a new game/data request begins,
+  this number increases.
 
-const targetCollections = {
-  4: new Set(),
-  5: new Set(),
-  6: new Set(),
-  7: new Set()
-};
+  If an older asynchronous request finishes after
+  the user has selected another word length, its
+  result is ignored.
+*/
+let gameRequestId = 0;
 
-let dictionariesLoaded = false;
-let targetListsLoaded = false;
+/*
+  Word and target collections are cached by length.
 
-/* ------------------------------
+  This means:
+
+  First 5-letter game:
+    download words-5.json
+    download targets-5.json
+
+  Second 5-letter game:
+    use the already loaded Sets.
+
+  Switching to 6 letters:
+    download only the two 6-letter files.
+*/
+const wordCollections = new Map();
+const targetCollections = new Map();
+
+/*
+  Prevent duplicate network requests if the same
+  word length is requested more than once before
+  the first request has completed.
+*/
+const dataLoadPromises = new Map();
+
+/*
+  ResizeObserver lets the board react to changes
+  in the available width.
+*/
+let boardResizeObserver = null;
+
+/* --------------------------------
    Page element initialisation
-   ------------------------------ */
+   -------------------------------- */
 
 function cachePageElements() {
-  board =
-    document.querySelector(".board");
-
-  statusMessage =
-    document.querySelector(".stage-status");
-
-  newGameButton =
-    document.querySelector("#new-game");
-
-  wordLengthSelect =
-    document.querySelector("#word-length");
+  board = document.querySelector(".board");
+  statusMessage = document.querySelector(".stage-status");
+  newGameButton = document.querySelector("#new-game");
+  wordLengthSelect = document.querySelector("#word-length");
+  instructions = document.querySelector(".instructions");
 
   if (!board) {
     console.error(
-      "Stage 17: .board element was not found."
+      "Stage 18: .board element was not found."
     );
   }
 }
 
-/* ------------------------------
+/* --------------------------------
    Status helpers
-   ------------------------------ */
+   -------------------------------- */
 
 function showMessage(message) {
   if (statusMessage) {
@@ -161,51 +181,53 @@ function showMessage(message) {
   }
 }
 
-/* ------------------------------
+/* --------------------------------
    Word-length helpers
-   ------------------------------ */
+   -------------------------------- */
 
 function isSupportedWordLength(length) {
-  return SUPPORTED_WORD_LENGTHS.includes(
-    length
-  );
-}
-
-function getWordLengthWords() {
-  return (
-    wordCollections[WORD_LENGTH] ||
-    new Set()
-  );
-}
-
-function getWordLengthTargets() {
-  return (
-    targetCollections[WORD_LENGTH] ||
-    new Set()
-  );
+  return SUPPORTED_WORD_LENGTHS.includes(length);
 }
 
 function isRandomWordLengthSelected() {
   return (
     wordLengthSelect &&
-    wordLengthSelect.value ===
-      RANDOM_WORD_LENGTH
+    wordLengthSelect.value === RANDOM_WORD_LENGTH
   );
 }
 
-/* ------------------------------
+function getSelectedWordLength() {
+  if (isRandomWordLengthSelected()) {
+    return getRandomWordLength();
+  }
+
+  const selectedLength = Number(
+    wordLengthSelect
+      ? wordLengthSelect.value
+      : DEFAULT_WORD_LENGTH
+  );
+
+  if (isSupportedWordLength(selectedLength)) {
+    return selectedLength;
+  }
+
+  if (wordLengthSelect) {
+    wordLengthSelect.value = String(
+      DEFAULT_WORD_LENGTH
+    );
+  }
+
+  return DEFAULT_WORD_LENGTH;
+}
+
+/* --------------------------------
    Randomness
-   ------------------------------ */
+   -------------------------------- */
 
 /*
   Uses Web Crypto where available.
 
-  Rejection sampling prevents bias when
-  the number of choices does not divide
-  evenly into the 32-bit random range.
-
-  Math.random() is retained only as a
-  fallback for older environments.
+  Rejection sampling prevents modulo bias.
 */
 function getSecureRandomIndex(length) {
   if (length <= 0) {
@@ -214,34 +236,23 @@ function getSecureRandomIndex(length) {
 
   if (
     window.crypto &&
-    typeof window.crypto.getRandomValues ===
-      "function"
+    typeof window.crypto.getRandomValues === "function"
   ) {
     const range = 0x100000000;
 
     const limit =
-      range -
-      (range % length);
+      range - (range % length);
 
-    const randomValues =
-      new Uint32Array(1);
+    const randomValues = new Uint32Array(1);
 
     let randomValue;
 
     do {
-      window.crypto.getRandomValues(
-        randomValues
-      );
+      window.crypto.getRandomValues(randomValues);
+      randomValue = randomValues[0];
+    } while (randomValue >= limit);
 
-      randomValue =
-        randomValues[0];
-    } while (
-      randomValue >= limit
-    );
-
-    return (
-      randomValue % length
-    );
+    return randomValue % length;
   }
 
   return Math.floor(
@@ -250,25 +261,457 @@ function getSecureRandomIndex(length) {
 }
 
 function getRandomWordLength() {
-  const randomIndex =
-    getSecureRandomIndex(
-      SUPPORTED_WORD_LENGTHS.length
-    );
+  const randomIndex = getSecureRandomIndex(
+    SUPPORTED_WORD_LENGTHS.length
+  );
 
-  return SUPPORTED_WORD_LENGTHS[
-    randomIndex
-  ];
+  return SUPPORTED_WORD_LENGTHS[randomIndex];
 }
 
-/* ------------------------------
-   Target-word helpers
-   ------------------------------ */
+/* --------------------------------
+   Data helpers
+   -------------------------------- */
 
-function getRandomTargetWord() {
-  const targets =
-    Array.from(
-      getWordLengthTargets()
+function getWordCollection(length = WORD_LENGTH) {
+  return wordCollections.get(length) || new Set();
+}
+
+function getTargetCollection(length = WORD_LENGTH) {
+  return targetCollections.get(length) || new Set();
+}
+
+/* --------------------------------
+   JSON loading
+   -------------------------------- */
+
+/*
+  Load and validate one JSON word list.
+
+  Important:
+  We intentionally do NOT use:
+
+    cache: "no-store"
+
+  Static GitHub Pages data should be allowed to use
+  normal browser/CDN caching.
+*/
+async function loadWordList(
+  filePath,
+  length,
+  listName
+) {
+  let response;
+
+  try {
+    response = await fetch(filePath);
+  } catch (error) {
+    console.error(
+      `Stage 18: Fetch failed for ${filePath}:`,
+      error
     );
+
+    throw new Error(
+      `Network error while loading ${filePath}.`
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Could not load ${filePath} — HTTP ${response.status}.`
+    );
+  }
+
+  let data;
+
+  try {
+    data = await response.json();
+  } catch (error) {
+    console.error(
+      `Stage 18: Invalid JSON in ${filePath}:`,
+      error
+    );
+
+    throw new Error(
+      `${filePath} is not valid JSON.`
+    );
+  }
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      `${filePath} must contain a JSON array of words.`
+    );
+  }
+
+  const words = new Set();
+
+  for (const word of data) {
+    if (typeof word !== "string") {
+      continue;
+    }
+
+    const normalisedWord = word
+      .trim()
+      .toUpperCase();
+
+    /*
+      Only alphabetic words of the expected length
+      are accepted.
+    */
+    if (
+      normalisedWord.length === length &&
+      /^[A-Z]+$/.test(normalisedWord)
+    ) {
+      words.add(normalisedWord);
+    }
+  }
+
+  if (words.size === 0) {
+    throw new Error(
+      `${filePath} contained no valid ${length}-letter words.`
+    );
+  }
+
+  console.log(
+    `Stage 18: Loaded ${words.size} ${length}-letter ${listName}.`
+  );
+
+  return words;
+}
+
+/* --------------------------------
+   Target validation
+   -------------------------------- */
+
+/*
+  A target must also be an accepted guess.
+
+  Invalid targets are removed rather than preventing
+  the whole game from starting.
+*/
+function validateTargets(
+  targets,
+  words,
+  length
+) {
+  const validTargets = new Set();
+
+  let removedCount = 0;
+
+  for (const target of targets) {
+    if (words.has(target)) {
+      validTargets.add(target);
+    } else {
+      removedCount += 1;
+    }
+  }
+
+  if (removedCount > 0) {
+    console.warn(
+      `Stage 18: Removed ${removedCount} invalid ` +
+      `${length}-letter target(s) because they are ` +
+      `not present in words-${length}.json.`
+    );
+  }
+
+  if (validTargets.size === 0) {
+    throw new Error(
+      `No usable ${length}-letter target words remain ` +
+      `after validation.`
+    );
+  }
+
+  return validTargets;
+}
+
+/* --------------------------------
+   Lazy data loading
+   -------------------------------- */
+
+/*
+  Load exactly one word length.
+
+  The two files are requested in parallel.
+*/
+async function loadLengthData(length) {
+  if (!isSupportedWordLength(length)) {
+    throw new Error(
+      `Unsupported word length: ${length}.`
+    );
+  }
+
+  /*
+    Return cached data immediately.
+  */
+  if (
+    wordCollections.has(length) &&
+    targetCollections.has(length)
+  ) {
+    return {
+      words: wordCollections.get(length),
+      targets: targetCollections.get(length)
+    };
+  }
+
+  /*
+    If this length is already being loaded,
+    reuse that Promise.
+  */
+  if (dataLoadPromises.has(length)) {
+    return dataLoadPromises.get(length);
+  }
+
+  const loadPromise = (async () => {
+    showMessage(
+      `Loading ${length}-letter game data…`
+    );
+
+    /*
+      Fetch guess and target data simultaneously.
+    */
+    const [words, rawTargets] = await Promise.all([
+      loadWordList(
+        WORD_DATA_FILES[length],
+        length,
+        "guess words"
+      ),
+      loadWordList(
+        TARGET_DATA_FILES[length],
+        length,
+        "target words"
+      )
+    ]);
+
+    /*
+      Validate the target list against the guess list.
+    */
+    const validTargets = validateTargets(
+      rawTargets,
+      words,
+      length
+    );
+
+    wordCollections.set(
+      length,
+      words
+    );
+
+    targetCollections.set(
+      length,
+      validTargets
+    );
+
+    console.log(
+      `Stage 18: ${validTargets.size} valid ` +
+      `${length}-letter targets available.`
+    );
+
+    return {
+      words,
+      targets: validTargets
+    };
+  })();
+
+  dataLoadPromises.set(
+    length,
+    loadPromise
+  );
+
+  try {
+    return await loadPromise;
+  } catch (error) {
+    /*
+      Remove the failed Promise so a later attempt
+      can retry the request.
+    */
+    dataLoadPromises.delete(length);
+
+    throw error;
+  }
+}
+
+/* --------------------------------
+   Board sizing
+   -------------------------------- */
+
+/*
+  The existing CSS uses:
+
+    --tile-size
+    --word-length
+
+  We update --tile-size directly on the board.
+
+  This solves the narrow-screen problem for 6- and
+  7-letter boards without requiring fixed mobile
+  breakpoints.
+*/
+function resizeBoard() {
+  if (!board || rows.length === 0) {
+    return;
+  }
+
+  const firstRow = rows[0];
+
+  if (!firstRow) {
+    return;
+  }
+
+  const computedStyle =
+    window.getComputedStyle(firstRow);
+
+  const gap =
+    parseFloat(computedStyle.columnGap) ||
+    parseFloat(computedStyle.gap) ||
+    BOARD_GAP_FALLBACK;
+
+  const availableWidth =
+    board.clientWidth ||
+    board.parentElement?.clientWidth ||
+    window.innerWidth;
+
+  const totalGap =
+    gap * Math.max(0, WORD_LENGTH - 1);
+
+  const calculatedTileSize =
+    Math.floor(
+      (availableWidth - totalGap) /
+      WORD_LENGTH
+    );
+
+  const tileSize = Math.max(
+    30,
+    Math.min(
+      BOARD_MAX_TILE_SIZE,
+      calculatedTileSize
+    )
+  );
+
+  board.style.setProperty(
+    "--tile-size",
+    `${tileSize}px`
+  );
+}
+
+function setupBoardResizeHandling() {
+  if (!board) {
+    return;
+  }
+
+  if (
+    typeof ResizeObserver === "function"
+  ) {
+    if (!boardResizeObserver) {
+      boardResizeObserver =
+        new ResizeObserver(() => {
+          resizeBoard();
+        });
+    }
+
+    boardResizeObserver.observe(board);
+  }
+
+  window.addEventListener(
+    "resize",
+    resizeBoard
+  );
+
+  resizeBoard();
+}
+
+/* --------------------------------
+   Instructions
+   -------------------------------- */
+
+function updateInstructions() {
+  if (!instructions) {
+    return;
+  }
+
+  instructions.textContent =
+    `Guess the ${WORD_LENGTH}-letter word in six tries.`;
+}
+
+/* --------------------------------
+   Board creation
+   -------------------------------- */
+
+/*
+  The board is deliberately independent of JSON.
+
+  This function must remain synchronous.
+
+  It is called before any data loading so the user
+  immediately sees the game board.
+*/
+function createBoard() {
+  if (!board) {
+    console.error(
+      "Stage 18: Cannot create board because .board was not found."
+    );
+
+    return false;
+  }
+
+  board.innerHTML = "";
+
+  rows = [];
+
+  for (
+    let rowIndex = 0;
+    rowIndex < MAX_GUESSES;
+    rowIndex += 1
+  ) {
+    const row =
+      document.createElement("div");
+
+    row.className = "row";
+
+    row.setAttribute(
+      "aria-label",
+      `Guess ${rowIndex + 1}`
+    );
+
+    row.style.setProperty(
+      "--word-length",
+      WORD_LENGTH
+    );
+
+    for (
+      let tileIndex = 0;
+      tileIndex < WORD_LENGTH;
+      tileIndex += 1
+    ) {
+      const tile =
+        document.createElement("div");
+
+      tile.className = "tile";
+
+      tile.setAttribute(
+        "aria-label",
+        `Guess ${rowIndex + 1}, ` +
+        `position ${tileIndex + 1}: empty`
+      );
+
+      row.appendChild(tile);
+    }
+
+    board.appendChild(row);
+    rows.push(row);
+  }
+
+  resizeBoard();
+
+  return true;
+}
+
+/* --------------------------------
+   Target selection
+   -------------------------------- */
+
+function getRandomTargetWord(length = WORD_LENGTH) {
+  const targets = Array.from(
+    getTargetCollection(length)
+  );
 
   if (targets.length === 0) {
     return "";
@@ -288,525 +731,176 @@ function selectRandomTarget() {
 
   if (!targetWord) {
     throw new Error(
-      `No target words are available for ${WORD_LENGTH}-letter games.`
+      `No target words are available for ` +
+      `${WORD_LENGTH}-letter games.`
     );
   }
 
-  console.log(
-    `Selected ${WORD_LENGTH}-letter target: ${targetWord}`
-  );
-}
-
-/* ------------------------------
-   JSON loading
-   ------------------------------ */
-
-/*
-  Load one JSON list.
-
-  The function intentionally uses the
-  simple page-relative paths that worked
-  correctly on the GitHub Pages deployment.
-*/
-async function loadWordList(
-  filePath,
-  length,
-  listName
-) {
-  console.log(
-    `Stage 17: Loading ${listName} from ${filePath}`
-  );
-
-  let response;
-
-  try {
-    response =
-      await fetch(
-        filePath,
-        {
-          cache: "no-store"
-        }
-      );
-  } catch (error) {
-    console.error(
-      `Fetch failed for ${filePath}:`,
-      error
-    );
-
-    throw new Error(
-      `Network error while loading ${filePath}.`
-    );
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Could not load ${filePath} — HTTP ${response.status}.`
-    );
-  }
-
-  let data;
-
-  try {
-    data =
-      await response.json();
-  } catch (error) {
-    console.error(
-      `Invalid JSON in ${filePath}:`,
-      error
-    );
-
-    throw new Error(
-      `${filePath} is not valid JSON.`
-    );
-  }
-
-  if (!Array.isArray(data)) {
-    throw new Error(
-      `${filePath} must contain a JSON array of words.`
-    );
-  }
-
-  const words =
-    new Set();
-
-  data.forEach(
-    (word) => {
-      if (
-        typeof word !==
-        "string"
-      ) {
-        return;
-      }
-
-      const normalisedWord =
-        word
-          .trim()
-          .toUpperCase();
-
-      if (
-        normalisedWord.length ===
-          length &&
-        /^[A-Z]+$/.test(
-          normalisedWord
-        )
-      ) {
-        words.add(
-          normalisedWord
-        );
-      }
-    }
-  );
-
-  if (words.size === 0) {
-    throw new Error(
-      `${filePath} contained no valid ${length}-letter words.`
-    );
-  }
-
-  console.log(
-    `Stage 17: Loaded ${words.size} ${length}-letter ${listName}.`
-  );
-
-  return words;
-}
-
-/* ------------------------------
-   Dictionary loading
-   ------------------------------ */
-
-async function loadDictionaries() {
-  for (
-    const length of
-      SUPPORTED_WORD_LENGTHS
-  ) {
-    try {
-      const words =
-        await loadWordList(
-          WORD_DATA_FILES[length],
-          length,
-          "guess words"
-        );
-
-      wordCollections[length] =
-        words;
-    } catch (error) {
-      dictionariesLoaded =
-        false;
-
-      console.error(
-        `Dictionary loading failed for ${length}-letter words:`,
-        error
-      );
-
-      showMessage(
-        `Dictionary error: ${error.message}`
-      );
-
-      return false;
-    }
-  }
-
-  dictionariesLoaded =
-    true;
-
-  console.log(
-    "Stage 17: All guess dictionaries loaded successfully."
-  );
-
-  return true;
-}
-
-/* ------------------------------
-   Target-list loading
-   ------------------------------ */
-
-async function loadTargetLists() {
-  for (
-    const length of
-      SUPPORTED_WORD_LENGTHS
-  ) {
-    try {
-      const targets =
-        await loadWordList(
-          TARGET_DATA_FILES[length],
-          length,
-          "target words"
-        );
-
-      targetCollections[length] =
-        targets;
-    } catch (error) {
-      targetListsLoaded =
-        false;
-
-      console.error(
-        `Target loading failed for ${length}-letter targets:`,
-        error
-      );
-
-      showMessage(
-        `Target-list error: ${error.message}`
-      );
-
-      return false;
-    }
-  }
-
-  targetListsLoaded =
-    true;
-
-  console.log(
-    "Stage 17: All target lists loaded successfully."
-  );
-
-  return true;
-}
-
-/* ------------------------------
-   Target-list validation
-   ------------------------------ */
-
-/*
-  Target words must also exist in the
-  corresponding guess dictionary.
-
-  Instead of stopping the entire game when
-  one target is missing from the dictionary,
-  invalid cross-list targets are removed.
-
-  This means one bad entry cannot prevent
-  the board or game from loading.
-*/
-function validateTargetListsAgainstDictionaries() {
-  for (
-    const length of
-      SUPPORTED_WORD_LENGTHS
-  ) {
-    const targets =
-      targetCollections[length];
-
-    const words =
-      wordCollections[length];
-
-    const validTargets =
-      new Set();
-
-    let removedCount = 0;
-
-    for (
-      const target of targets
-    ) {
-      if (
-        words.has(target)
-      ) {
-        validTargets.add(
-          target
-        );
-      } else {
-        removedCount += 1;
-
-        console.warn(
-          `Stage 17: Target "${target}" from targets-${length}.json is not present in words-${length}.json and will not be used.`
-        );
-      }
-    }
-
-    targetCollections[length] =
-      validTargets;
-
-    console.log(
-      `Stage 17: ${validTargets.size} valid ${length}-letter targets available.`
-    );
-
-    if (
-      removedCount > 0
-    ) {
-      console.warn(
-        `Stage 17: Removed ${removedCount} invalid ${length}-letter target(s).`
-      );
-    }
-
-    if (
-      validTargets.size === 0
-    ) {
-      throw new Error(
-        `No usable ${length}-letter target words remain after validation.`
-      );
-    }
-  }
-
-  console.log(
-    "Stage 17: Target-list validation completed successfully."
-  );
-}
-
-/* ------------------------------
-   Instructions
-   ------------------------------ */
-
-function updateInstructions() {
-  const instructions =
-    document.querySelector(
-      ".instructions"
-    );
-
-  if (!instructions) {
-    return;
-  }
-
-  instructions.textContent =
-    `Guess the ${WORD_LENGTH}-letter word in six tries.`;
-}
-
-/* ------------------------------
-   Board creation
-   ------------------------------ */
-
-function createBoard() {
   /*
-    The board is deliberately independent
-    of JSON loading.
+    Deliberately do not log targetWord here.
+
+    Logging the answer to the console made the target
+    immediately visible through browser DevTools.
   */
-
-  if (!board) {
-    console.error(
-      "Stage 17: Cannot create board because .board was not found."
-    );
-
-    return false;
-  }
-
-  board.innerHTML =
-    "";
-
-  for (
-    let rowIndex = 0;
-    rowIndex < MAX_GUESSES;
-    rowIndex += 1
-  ) {
-    const row =
-      document.createElement(
-        "div"
-      );
-
-    row.className =
-      "row";
-
-    row.setAttribute(
-      "aria-label",
-      `Guess ${rowIndex + 1}`
-    );
-
-    row.style.setProperty(
-      "--word-length",
-      WORD_LENGTH
-    );
-
-    for (
-      let tileIndex = 0;
-      tileIndex < WORD_LENGTH;
-      tileIndex += 1
-    ) {
-      const tile =
-        document.createElement(
-          "div"
-        );
-
-      tile.className =
-        "tile";
-
-      tile.setAttribute(
-        "aria-label",
-        `Guess ${rowIndex + 1}, position ${tileIndex + 1}: empty`
-      );
-
-      row.appendChild(
-        tile
-      );
-    }
-
-    board.appendChild(
-      row
-    );
-  }
-
-  rows =
-    Array.from(
-      board.querySelectorAll(
-        ".row"
-      )
-    );
-
-  console.log(
-    `Stage 17: Board created with ${MAX_GUESSES} rows and ${WORD_LENGTH} tiles per row.`
-  );
-
-  return true;
 }
 
-/* ------------------------------
-   Word-length determination
-   ------------------------------ */
+/* --------------------------------
+   Game state reset
+   -------------------------------- */
 
-function determineWordLength() {
-  if (
-    isRandomWordLengthSelected()
-  ) {
-    WORD_LENGTH =
-      getRandomWordLength();
-
-    return;
-  }
-
-  const selectedLength =
-    Number(
-      wordLengthSelect
-        ? wordLengthSelect.value
-        : DEFAULT_WORD_LENGTH
-    );
-
-  if (
-    isSupportedWordLength(
-      selectedLength
-    )
-  ) {
-    WORD_LENGTH =
-      selectedLength;
-
-    return;
-  }
-
-  WORD_LENGTH =
-    DEFAULT_WORD_LENGTH;
-
-  if (wordLengthSelect) {
-    wordLengthSelect.value =
-      String(
-        DEFAULT_WORD_LENGTH
-      );
-  }
+function resetGameState() {
+  currentRow = 0;
+  currentTile = 0;
+  gameOver = false;
 }
 
-/* ------------------------------
+/* --------------------------------
    Game initialisation
-   ------------------------------ */
+   -------------------------------- */
 
-function initialiseGame() {
-  if (
-    !dictionariesLoaded ||
-    !targetListsLoaded
-  ) {
-    showMessage(
-      "Game data has not finished loading."
-    );
+/*
+  Start a playable game for the currently selected
+  word length.
 
-    return;
-  }
+  This function:
+  1. Determines the length.
+  2. Creates the board immediately.
+  3. Loads only that length's data.
+  4. Selects a target.
+  5. Enables input.
+*/
+async function initialiseGame() {
+  const requestId =
+    ++gameRequestId;
 
-  determineWordLength();
+  gameReady = false;
+  dataLoading = true;
+  gameOver = false;
 
-  try {
-    selectRandomTarget();
-  } catch (error) {
-    console.error(
-      "Stage 17: Target selection failed:",
-      error
-    );
+  /*
+    Determine the requested length before loading data.
+  */
+  WORD_LENGTH =
+    getSelectedWordLength();
 
-    showMessage(
-      error.message
-    );
+  /*
+    Create the board FIRST.
 
-    return;
-  }
-
+    This is the critical fix for the board loading issue.
+  */
+  resetGameState();
   createBoard();
-
   updateInstructions();
 
-  currentRow =
-    0;
-
-  currentTile =
-    0;
-
-  gameOver =
-    false;
-
-  if (
-    isRandomWordLengthSelected()
-  ) {
-    showMessage(
-      `Stage 17: Random ${WORD_LENGTH}-letter game`
-    );
-  } else {
-    showMessage(
-      `Stage 17: ${WORD_LENGTH}-letter game`
-    );
+  if (newGameButton) {
+    newGameButton.hidden = true;
   }
 
-  if (newGameButton) {
-    newGameButton.hidden =
-      true;
+  showMessage(
+    `Loading ${WORD_LENGTH}-letter game…`
+  );
+
+  try {
+    const { words, targets } =
+      await loadLengthData(
+        WORD_LENGTH
+      );
+
+    /*
+      The user may have changed the word length while
+      the request was running.
+
+      Ignore this old request if it is no longer current.
+    */
+    if (
+      requestId !== gameRequestId
+    ) {
+      return;
+    }
+
+    if (
+      !words ||
+      !targets ||
+      words.size === 0 ||
+      targets.size === 0
+    ) {
+      throw new Error(
+        `No usable data is available for ` +
+        `${WORD_LENGTH}-letter games.`
+      );
+    }
+
+    /*
+      Select the target only after the correct data
+      has loaded.
+    */
+    selectRandomTarget();
+
+    resetGameState();
+
+    gameReady = true;
+    dataLoading = false;
+
+    updateInstructions();
+    resizeBoard();
+
+    if (
+      isRandomWordLengthSelected()
+    ) {
+      showMessage(
+        `Random ${WORD_LENGTH}-letter game`
+      );
+    } else {
+      showMessage(
+        `${WORD_LENGTH}-letter game`
+      );
+    }
+
+    if (newGameButton) {
+      newGameButton.hidden = true;
+    }
+  } catch (error) {
+    /*
+      Ignore failures from an obsolete request.
+    */
+    if (
+      requestId !== gameRequestId
+    ) {
+      return;
+    }
+
+    gameReady = false;
+    dataLoading = false;
+    gameOver = true;
+
+    console.error(
+      "Stage 18: Game initialisation failed:",
+      error
+    );
+
+    showMessage(
+      `Game data error: ${error.message}`
+    );
+
+    if (newGameButton) {
+      newGameButton.hidden = false;
+    }
   }
 }
 
-/* ------------------------------
+/* --------------------------------
    Board helpers
-   ------------------------------ */
+   -------------------------------- */
 
 function getCurrentRowTiles() {
-  if (
-    !rows[currentRow]
-  ) {
+  if (!rows[currentRow]) {
     return [];
   }
 
   return Array.from(
-    rows[currentRow]
-      .querySelectorAll(
-        ".tile"
-      )
+    rows[currentRow].querySelectorAll(
+      ".tile"
+    )
   ).slice(
     0,
     WORD_LENGTH
@@ -814,19 +908,12 @@ function getCurrentRowTiles() {
 }
 
 function getCurrentGuess() {
-  const tiles =
-    getCurrentRowTiles();
-
-  return tiles
-    .slice(
-      0,
-      currentTile
-    )
-    .map(
-      (tile) =>
-        tile.textContent
-          .trim()
-          .toUpperCase()
+  return getCurrentRowTiles()
+    .slice(0, currentTile)
+    .map((tile) =>
+      tile.textContent
+        .trim()
+        .toUpperCase()
     )
     .join("");
 }
@@ -843,19 +930,20 @@ function updateTileInputLabel(
 
   tile.setAttribute(
     "aria-label",
-    `Guess ${rowIndex + 1}, position ${tileIndex + 1}: ${letter}`
+    `Guess ${rowIndex + 1}, ` +
+    `position ${tileIndex + 1}: ${letter}`
   );
 }
 
-/* ------------------------------
+/* --------------------------------
    Letter input
-   ------------------------------ */
+   -------------------------------- */
 
 function addLetter(letter) {
   if (
+    !gameReady ||
     gameOver ||
-    currentTile >=
-      WORD_LENGTH
+    currentTile >= WORD_LENGTH
   ) {
     return;
   }
@@ -863,17 +951,18 @@ function addLetter(letter) {
   const tiles =
     getCurrentRowTiles();
 
-  if (
-    !tiles[currentTile]
-  ) {
+  if (!tiles[currentTile]) {
     return;
   }
 
   const upperLetter =
     letter.toUpperCase();
 
-  tiles[currentTile]
-    .textContent =
+  if (!/^[A-Z]$/.test(upperLetter)) {
+    return;
+  }
+
+  tiles[currentTile].textContent =
     upperLetter;
 
   updateTileInputLabel(
@@ -888,6 +977,7 @@ function addLetter(letter) {
 
 function removeLetter() {
   if (
+    !gameReady ||
     gameOver ||
     currentTile <= 0
   ) {
@@ -899,40 +989,45 @@ function removeLetter() {
   const tiles =
     getCurrentRowTiles();
 
-  if (
-    tiles[currentTile]
-  ) {
-    tiles[currentTile]
-      .textContent =
-      "";
+  if (tiles[currentTile]) {
+    tiles[currentTile].textContent = "";
 
-    tiles[currentTile]
-      .setAttribute(
-        "aria-label",
-        `Guess ${currentRow + 1}, position ${currentTile + 1}: empty`
-      );
+    tiles[currentTile].setAttribute(
+      "aria-label",
+      `Guess ${currentRow + 1}, ` +
+      `position ${currentTile + 1}: empty`
+    );
   }
 }
 
 function handleLetter(letter) {
   if (
-    /^[a-zA-Z]$/.test(
-      letter
-    )
+    /^[a-zA-Z]$/.test(letter)
   ) {
     addLetter(letter);
   }
 }
 
-/* ------------------------------
+/* --------------------------------
    Guess evaluation
-   ------------------------------ */
+   -------------------------------- */
 
+/*
+  Wordle-style duplicate-letter handling.
+
+  Pass 1:
+    Mark exact matches.
+
+  Pass 2:
+    Match remaining letters as present.
+
+  This prevents a repeated guess letter from being
+  incorrectly marked present more times than it exists
+  in the target.
+*/
 function evaluateGuess(guess) {
   const results =
-    Array(
-      WORD_LENGTH
-    ).fill(
+    Array(WORD_LENGTH).fill(
       "absent"
     );
 
@@ -943,7 +1038,6 @@ function evaluateGuess(guess) {
     First pass:
     exact matches.
   */
-
   for (
     let index = 0;
     index < WORD_LENGTH;
@@ -965,7 +1059,6 @@ function evaluateGuess(guess) {
     Second pass:
     present but incorrectly positioned.
   */
-
   for (
     let index = 0;
     index < WORD_LENGTH;
@@ -984,8 +1077,7 @@ function evaluateGuess(guess) {
       );
 
     if (
-      matchingIndex !==
-      -1
+      matchingIndex !== -1
     ) {
       results[index] =
         "present";
@@ -999,18 +1091,12 @@ function evaluateGuess(guess) {
   return results;
 }
 
-function getResultDescription(
-  result
-) {
-  if (
-    result === "correct"
-  ) {
+function getResultDescription(result) {
+  if (result === "correct") {
     return "correct position";
   }
 
-  if (
-    result === "present"
-  ) {
+  if (result === "present") {
     return "correct letter, wrong position";
   }
 
@@ -1021,18 +1107,15 @@ function displayEvaluation(
   results,
   rowIndex
 ) {
-  if (
-    !rows[rowIndex]
-  ) {
+  if (!rows[rowIndex]) {
     return;
   }
 
   const tiles =
     Array.from(
-      rows[rowIndex]
-        .querySelectorAll(
-          ".tile"
-        )
+      rows[rowIndex].querySelectorAll(
+        ".tile"
+      )
     ).slice(
       0,
       WORD_LENGTH
@@ -1040,9 +1123,7 @@ function displayEvaluation(
 
   results.forEach(
     (result, index) => {
-      if (
-        !tiles[index]
-      ) {
+      if (!tiles[index]) {
         return;
       }
 
@@ -1051,31 +1132,41 @@ function displayEvaluation(
           .textContent
           .trim();
 
-      tiles[index]
-        .classList
-        .add(result);
+      /*
+        Clear any previous result classes before
+        applying the current one.
+      */
+      tiles[index].classList.remove(
+        "correct",
+        "present",
+        "absent"
+      );
 
-      tiles[index]
-        .setAttribute(
-          "aria-label",
-          `Guess ${rowIndex + 1}, position ${index + 1}: ${letter}, ${getResultDescription(result)}`
-        );
+      tiles[index].classList.add(
+        result
+      );
+
+      tiles[index].setAttribute(
+        "aria-label",
+        `Guess ${rowIndex + 1}, ` +
+        `position ${index + 1}: ` +
+        `${letter}, ` +
+        `${getResultDescription(result)}`
+      );
     }
   );
 }
 
-/* ------------------------------
+/* --------------------------------
    Win/loss handling
-   ------------------------------ */
+   -------------------------------- */
 
 function endGame(won) {
-  gameOver =
-    true;
+  gameOver = true;
+  gameReady = false;
 
   if (won) {
-    showMessage(
-      "You win!"
-    );
+    showMessage("You win!");
   } else {
     showMessage(
       `Game over — the word was ${targetWord}.`
@@ -1083,23 +1174,21 @@ function endGame(won) {
   }
 
   if (newGameButton) {
-    newGameButton.hidden =
-      false;
+    newGameButton.hidden = false;
   }
 }
 
-/* ------------------------------
+/* --------------------------------
    Guess submission
-   ------------------------------ */
+   -------------------------------- */
 
 function submitGuess() {
-  if (gameOver) {
+  if (!gameReady || gameOver) {
     return;
   }
 
   if (
-    currentTile !==
-    WORD_LENGTH
+    currentTile !== WORD_LENGTH
   ) {
     showMessage(
       "Not enough letters"
@@ -1112,8 +1201,7 @@ function submitGuess() {
     getCurrentGuess();
 
   if (
-    guess.length !==
-    WORD_LENGTH
+    guess.length !== WORD_LENGTH
   ) {
     showMessage(
       "Not enough letters"
@@ -1127,10 +1215,8 @@ function submitGuess() {
 
     The target list is NOT used here.
   */
-
   if (
-    !getWordLengthWords()
-      .has(guess)
+    !getWordCollection().has(guess)
   ) {
     showMessage(
       "Word not in list"
@@ -1140,9 +1226,7 @@ function submitGuess() {
   }
 
   const results =
-    evaluateGuess(
-      guess
-    );
+    evaluateGuess(guess);
 
   displayEvaluation(
     results,
@@ -1153,7 +1237,6 @@ function submitGuess() {
     guess === targetWord
   ) {
     endGame(true);
-
     return;
   }
 
@@ -1162,104 +1245,68 @@ function submitGuess() {
     MAX_GUESSES - 1
   ) {
     endGame(false);
-
     return;
   }
+
+  currentRow += 1;
+  currentTile = 0;
 
   showMessage(
     "Guess evaluated"
   );
-
-  currentRow += 1;
-
-  currentTile =
-    0;
 }
 
-/* ------------------------------
+/* --------------------------------
    New game
-   ------------------------------ */
+   -------------------------------- */
 
 function startNewGame() {
   initialiseGame();
 }
 
-/* ------------------------------
+/* --------------------------------
    Word-length selection
-   ------------------------------ */
+   -------------------------------- */
 
 function handleWordLengthChange() {
-  if (!wordLengthSelect) {
-    return;
-  }
-
-  const selectedValue =
-    wordLengthSelect.value;
-
-  if (
-    selectedValue ===
-    RANDOM_WORD_LENGTH
-  ) {
-    initialiseGame();
-
-    return;
-  }
-
-  const selectedLength =
-    Number(
-      selectedValue
-    );
-
-  if (
-    !isSupportedWordLength(
-      selectedLength
-    )
-  ) {
-    wordLengthSelect.value =
-      String(
-        DEFAULT_WORD_LENGTH
-      );
-
-    WORD_LENGTH =
-      DEFAULT_WORD_LENGTH;
-  } else {
-    WORD_LENGTH =
-      selectedLength;
-  }
+  /*
+    The board should change immediately when the user
+    changes the requested length, even if the new JSON
+    data takes time to download.
+  */
+  WORD_LENGTH =
+    getSelectedWordLength();
 
   initialiseGame();
 }
 
-/* ------------------------------
+/* --------------------------------
    Shared actions
-   ------------------------------ */
+   -------------------------------- */
 
 function handleAction(action) {
-  if (
-    action ===
-    "backspace"
-  ) {
+  if (action === "backspace") {
     removeLetter();
-
     return;
   }
 
-  if (
-    action ===
-    "enter"
-  ) {
+  if (action === "enter") {
     submitGuess();
   }
 }
 
-/* ------------------------------
+/* --------------------------------
    Physical keyboard
-   ------------------------------ */
+   -------------------------------- */
 
 function handlePhysicalKeyboard() {
   document.addEventListener(
     "keydown",
     (event) => {
+      /*
+        Do not interfere with browser/application
+        shortcuts.
+      */
       if (
         event.ctrlKey ||
         event.metaKey ||
@@ -1268,9 +1315,18 @@ function handlePhysicalKeyboard() {
         return;
       }
 
+      /*
+        Do not capture keyboard input while the user
+        is operating the word-length select.
+      */
       if (
-        event.key ===
-        "Backspace"
+        event.target === wordLengthSelect
+      ) {
+        return;
+      }
+
+      if (
+        event.key === "Backspace"
       ) {
         event.preventDefault();
 
@@ -1282,8 +1338,7 @@ function handlePhysicalKeyboard() {
       }
 
       if (
-        event.key ===
-        "Enter"
+        event.key === "Enter"
       ) {
         event.preventDefault();
 
@@ -1309,16 +1364,26 @@ function handlePhysicalKeyboard() {
   );
 }
 
-/* ------------------------------
+/* --------------------------------
    On-screen keyboard
-   ------------------------------ */
+   -------------------------------- */
 
 function handleOnScreenKeyboard() {
   document.addEventListener(
     "click",
     (event) => {
+      const target =
+        event.target;
+
+      if (
+        !target ||
+        typeof target.closest !== "function"
+      ) {
+        return;
+      }
+
       const button =
-        event.target.closest(
+        target.closest(
           "button[data-key]"
         );
 
@@ -1333,48 +1398,57 @@ function handleOnScreenKeyboard() {
         key === "enter" ||
         key === "backspace"
       ) {
-        handleAction(
-          key
-        );
-
+        handleAction(key);
         return;
       }
 
-      handleLetter(
-        key
-      );
+      handleLetter(key);
     }
   );
 }
 
-/* ------------------------------
+/* --------------------------------
    Application startup
-   ------------------------------ */
+   -------------------------------- */
 
-async function startApplication() {
+function startApplication() {
   /*
-    Cache the page elements first.
+    Cache DOM references before doing anything else.
   */
-
   cachePageElements();
 
+  if (!board) {
+    showMessage(
+      "Game board could not be initialised."
+    );
+
+    return;
+  }
+
   /*
-    Create the board immediately.
-
-    This is the critical protection against
-    JSON-loading problems hiding the board.
+    Determine the initial length.
   */
+  WORD_LENGTH =
+    getSelectedWordLength();
 
-  determineWordLength();
+  /*
+    CRITICAL:
 
+    Build the board synchronously before starting
+    ANY asynchronous JSON request.
+
+    The user therefore sees the six-row board
+    immediately.
+  */
   createBoard();
 
   updateInstructions();
 
-  /*
-    Attach controls immediately as well.
-  */
+  setupBoardResizeHandling();
 
+  /*
+    Attach controls immediately.
+  */
   if (wordLengthSelect) {
     wordLengthSelect.addEventListener(
       "change",
@@ -1390,76 +1464,21 @@ async function startApplication() {
   }
 
   handlePhysicalKeyboard();
-
   handleOnScreenKeyboard();
 
   /*
-    The board now exists regardless of whether
-    the JSON files load successfully.
+    The board is already visible here.
+    Now load only the selected length.
   */
-
-  showMessage(
-    "Stage 17: Loading game data…"
-  );
-
-  /*
-    Load the general guess dictionaries.
-  */
-
-  const dictionariesOk =
-    await loadDictionaries();
-
-  if (!dictionariesOk) {
-    return;
-  }
-
-  /*
-    Load the dedicated target lists.
-  */
-
-  const targetsOk =
-    await loadTargetLists();
-
-  if (!targetsOk) {
-    return;
-  }
-
-  /*
-    Make sure every target is also a legal
-    guess. Invalid target entries are removed
-    rather than preventing the game loading.
-  */
-
-  try {
-    validateTargetListsAgainstDictionaries();
-  } catch (error) {
-    console.error(
-      "Stage 17 target validation failed:",
-      error
-    );
-
-    showMessage(
-      `Target-list error: ${error.message}`
-    );
-
-    return;
-  }
-
-  /*
-    Everything required for a playable game
-    is now available.
-  */
-
   initialiseGame();
 }
 
-/* ------------------------------
+/* --------------------------------
    Start application safely
-   ------------------------------ */
+   -------------------------------- */
 
 if (
-  document.readyState ===
-  "loading"
+  document.readyState === "loading"
 ) {
   document.addEventListener(
     "DOMContentLoaded",
