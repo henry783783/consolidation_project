@@ -4,7 +4,7 @@
 
   This file controls:
   - Fixed and random word-length selection.
-  - Random target selection.
+  - Cryptographically strong random target selection.
   - Dynamic board creation.
   - Physical keyboard input.
   - On-screen keyboard input.
@@ -25,6 +25,11 @@
   Stage 14 makes the target word random while keeping the
   development word collections and supported word lengths
   unchanged.
+
+  Randomness:
+  - Uses crypto.getRandomValues() instead of Math.random().
+  - No manually supplied seed is required.
+  - Rejection sampling is used to avoid modulo bias.
 */
 
 "use strict";
@@ -255,6 +260,40 @@ let currentTile = 0;
 let gameOver = false;
 
 /* ------------------------------
+   Randomness helpers
+   ------------------------------ */
+
+/*
+  Return a uniformly distributed random integer from
+  0 up to, but not including, max.
+
+  crypto.getRandomValues() obtains entropy from the
+  browser's secure random-number source.
+
+  Rejection sampling prevents modulo bias, ensuring
+  that every possible result has equal probability.
+*/
+function getSecureRandomInt(max) {
+  if (!Number.isInteger(max) || max <= 0) {
+    throw new Error(
+      "Random range must be a positive integer."
+    );
+  }
+
+  const maxUint32 = 0x100000000;
+  const limit =
+    maxUint32 - (maxUint32 % max);
+
+  const randomValues = new Uint32Array(1);
+
+  do {
+    crypto.getRandomValues(randomValues);
+  } while (randomValues[0] >= limit);
+
+  return randomValues[0] % max;
+}
+
+/* ------------------------------
    Word-length helpers
    ------------------------------ */
 
@@ -267,8 +306,8 @@ function getWordLengthWords() {
 }
 
 function getRandomWordLength() {
-  const randomIndex = Math.floor(
-    Math.random() * SUPPORTED_WORD_LENGTHS.length
+  const randomIndex = getSecureRandomInt(
+    SUPPORTED_WORD_LENGTHS.length
   );
 
   return SUPPORTED_WORD_LENGTHS[randomIndex];
@@ -286,26 +325,28 @@ function isRandomWordLengthSelected() {
    ------------------------------ */
 
 function getRandomTargetWord() {
-  const words = Array.from(getWordLengthWords());
+  const words = Array.from(
+    getWordLengthWords()
+  );
 
   if (words.length === 0) {
     return "";
   }
 
-  const randomIndex = Math.floor(
-    Math.random() * words.length
-  );
+  const randomIndex =
+    getSecureRandomInt(words.length);
 
   return words[randomIndex];
 }
 
 /*
-  Select a new target from the word collection for the
-  currently selected word length.
+  Select a new random target from the word collection
+  for the currently selected word length.
 
-  The target is deliberately chosen independently from the
-  word-length selection so that Stage 13's Random length
-  mode and Stage 14's Random target mode work together.
+  The target is deliberately chosen independently from
+  the word-length selection so that Stage 13's Random
+  length mode and Stage 14's Random target mode work
+  together.
 */
 function selectRandomTarget() {
   targetWord = getRandomTargetWord();
@@ -368,7 +409,8 @@ function createBoard() {
       tileIndex < WORD_LENGTH;
       tileIndex += 1
     ) {
-      const tile = document.createElement("div");
+      const tile =
+        document.createElement("div");
 
       tile.className = "tile";
 
@@ -394,8 +436,8 @@ function createBoard() {
 
 function initialiseGame() {
   /*
-    In Random mode, choose a supported word length every
-    time a new game begins.
+    In Random mode, choose a supported word length
+    every time a new game begins.
   */
   if (isRandomWordLengthSelected()) {
     WORD_LENGTH = getRandomWordLength();
@@ -447,7 +489,7 @@ function initialiseGame() {
 /*
   Build the initial game.
 
-  This now selects a random target instead of always
+  This selects a random target instead of always
   starting with CRANE.
 */
 initialiseGame();
