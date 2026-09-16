@@ -78,7 +78,7 @@ Add a Random option that selects one of the supported lengths
 whenever a new game begins and clearly tells the player which
 length was selected.
 
-[ ] Stage 14 — Random target selection
+[X] Stage 14 — Random target selection
 Replace the fixed CRANE target with random selection from the
 appropriate word collection. A new target must be selected
 whenever a new game begins, including when using New Game.
