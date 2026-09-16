@@ -285,6 +285,23 @@ function updateKeyboardState(
         ];
 
       const newPriority =
+        KEYBOARD_STATE_PRIORITY[
+          result
+        ];
+
+      if (
+        newPriority >
+        currentPriority
+      ) {
+        keyboardStates.set(
+          key,
+          result
+        );
+      }
+    });
+
+  renderKeyboardState();
+}
        
 
 /* --------------------------------
