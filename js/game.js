@@ -1,10 +1,12 @@
+```javascript
 /*
   Wordle-style game
-  Stage 14: Random target selection
+  Stage 16: Expanded dictionary
 
   This file controls:
   - Fixed and random word-length selection.
-  - Cryptographically strong random target selection.
+  - Random target selection.
+  - Loading the expanded word dictionaries.
   - Dynamic board creation.
   - Physical keyboard input.
   - On-screen keyboard input.
@@ -15,21 +17,16 @@
   - Win/loss detection.
   - New-game/reset behaviour.
 
-  Supported lengths at this stage:
+  Supported lengths:
   4, 5, 6 and 7 letters.
 
-  The word collections below remain small development
-  collections. Stage 16 will replace them with the project's
-  comprehensive English word dataset.
+  Dictionary data is stored separately in:
+  - data/words-4.json
+  - data/words-5.json
+  - data/words-6.json
+  - data/words-7.json
 
-  Stage 14 makes the target word random while keeping the
-  development word collections and supported word lengths
-  unchanged.
-
-  Randomness:
-  - Uses crypto.getRandomValues() instead of Math.random().
-  - No manually supplied seed is required.
-  - Rejection sampling is used to avoid modulo bias.
+  Stage 17 will validate and curate the expanded dictionary data.
 */
 
 "use strict";
@@ -43,200 +40,11 @@ const DEFAULT_WORD_LENGTH = 5;
 const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
-/*
-  Small development word collections.
-
-  These allow the supported lengths to be tested without
-  introducing the comprehensive dictionary before its
-  dedicated stages.
-*/
-const developmentWords = {
-  4: new Set([
-    "BALL",
-    "BEAR",
-    "BIRD",
-    "BOOK",
-    "COLD",
-    "DARK",
-    "FISH",
-    "GAME",
-    "GATE",
-    "HAND",
-    "HEAD",
-    "HOME",
-    "HOPE",
-    "KING",
-    "LIFE",
-    "LION",
-    "LOVE",
-    "MOON",
-    "RAIN",
-    "ROAD",
-    "STAR",
-    "TREE",
-    "WIND",
-    "WORD"
-  ]),
-
-  5: new Set([
-    "ABOUT", "ABOVE", "AFTER", "AGAIN", "ALONE", "APPLE",
-    "BEACH", "BEGIN", "BLACK", "BLAME", "BLIND", "BLOCK",
-    "BRAIN", "BRAVE", "BREAD", "BREAK", "BRING", "BROWN",
-    "BUILD", "CARRY", "CAUSE", "CHAIN", "CHAIR", "CHART",
-    "CHASE", "CHEAP", "CHECK", "CHEST", "CHILD", "CLEAN",
-    "CLEAR", "CLIMB", "CLOCK", "CLOSE", "CLOUD", "COACH",
-    "COAST", "COLOR", "COUNT", "COURT", "COVER", "CRANE",
-    "CRAZY", "CREAM", "CROSS", "CROWD", "CROWN", "DANCE",
-    "DEATH", "DEPTH", "DOUBT", "DOZEN", "DREAM", "DRINK",
-    "DRIVE", "EARTH", "EMPTY", "ENJOY", "ENTER", "EQUAL",
-    "ERROR", "EVENT", "EVERY", "FAITH", "FALSE", "FIELD",
-    "FIGHT", "FINAL", "FIRST", "FLOOR", "FOCUS", "FORCE",
-    "FOUND", "FRAME", "FRONT", "FRUIT", "FUNNY", "GIANT",
-    "GIVEN", "GLASS", "GOING", "GRANT", "GRASS", "GREAT",
-    "GREEN", "GROUP", "GUESS", "HAPPY", "HEART", "HEAVY",
-    "HOUSE", "HUMAN", "IDEAL", "IMAGE", "INDEX", "INNER",
-    "ISSUE", "JOINT", "JUDGE", "KNOWN", "LARGE", "LEARN",
-    "LEAST", "LEAVE", "LIGHT", "LIMIT", "LOCAL", "LOGIC",
-    "LUCKY", "MAGIC", "MAJOR", "MATCH", "MAYBE", "METAL",
-    "MIGHT", "MINOR", "MONEY", "MONTH", "MOUSE", "MOUTH",
-    "MOVIE", "MUSIC", "NEVER", "NIGHT", "NORTH", "NOVEL",
-    "OCEAN", "OFFER", "ORDER", "OTHER", "PAINT", "PAPER",
-    "PARTY", "PEACE", "PHONE", "PIECE", "PILOT", "PLACE",
-    "PLAIN", "PLANE", "PLANT", "POINT", "POWER", "PRESS",
-    "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR", "PROUD",
-    "QUEEN", "QUICK", "QUIET", "RADIO", "RAISE", "RANGE",
-    "REACH", "READY", "RIGHT", "RIVER", "ROUND", "ROYAL",
-    "SCALE", "SCENE", "SCORE", "SENSE", "SERVE", "SEVEN",
-    "SHARE", "SHARP", "SHEEP", "SHEET", "SHIFT", "SHINE",
-    "SHORT", "SHOUT", "SIGHT", "SINCE", "SIXTH", "SMALL",
-    "SMART", "SMILE", "SOUTH", "SPACE", "SPEAK", "SPEED",
-    "SPEND", "SPINE", "SPLIT", "SPORT", "STAGE", "STAIR",
-    "STAND", "START", "STATE", "STEAM", "STEEL", "STICK",
-    "STILL", "STOCK", "STONE", "STORE", "STORM", "STORY",
-    "SUGAR", "TABLE", "TEACH", "THANK", "THEIR", "THERE",
-    "THESE", "THING", "THINK", "THIRD", "THOSE", "THREE",
-    "THROW", "TIGHT", "TIMES", "TITLE", "TODAY", "TOTAL",
-    "TOUCH", "TOWER", "TRACK", "TRADE", "TRAIN", "TREAT",
-    "TRIAL", "TRUST", "TRUTH", "UNCLE", "UNDER", "UNION",
-    "UNTIL", "UPPER", "USUAL", "VALUE", "VIDEO", "VISIT",
-    "VOICE", "WASTE", "WATCH", "WATER", "WHEEL", "WHERE",
-    "WHILE", "WHITE", "WHOLE", "WHOSE", "WOMAN", "WORLD",
-    "WORRY", "WORTH", "WOULD", "WRITE", "WRONG", "YOUNG",
-    "YOUTH"
-  ]),
-
-  6: new Set([
-    "ALMOST",
-    "ALWAYS",
-    "ANSWER",
-    "AUTUMN",
-    "BEFORE",
-    "BETTER",
-    "BORDER",
-    "BRIGHT",
-    "BROKEN",
-    "BUTTON",
-    "CHANGE",
-    "CHOOSE",
-    "CIRCLE",
-    "CLOSED",
-    "COFFEE",
-    "COMMON",
-    "DANGER",
-    "DEGREE",
-    "DESERT",
-    "DOUBLE",
-    "EFFECT",
-    "ENOUGH",
-    "FAMILY",
-    "FATHER",
-    "FIGURE",
-    "FOLLOW",
-    "FRIEND",
-    "GARDEN",
-    "GROUND",
-    "HAPPEN",
-    "HEALTH",
-    "HONEST",
-    "INSIDE",
-    "ISLAND",
-    "LETTER",
-    "LITTLE",
-    "MARKET",
-    "MEMORY",
-    "MIDDLE",
-    "MORNING",
-    "MOTHER",
-    "NUMBER",
-    "OFFICE",
-    "PERSON",
-    "PLANET",
-    "PUBLIC",
-    "REASON",
-    "RESULT",
-    "SCHOOL",
-    "SIMPLE",
-    "SISTER",
-    "SOCIAL",
-    "SUMMER",
-    "SYSTEM",
-    "TARGET",
-    "TRAVEL",
-    "UNIQUE",
-    "WINDOW",
-    "WINTER",
-    "YELLOW"
-  ]),
-
-  7: new Set([
-    "ANOTHER",
-    "BALANCE",
-    "BECAUSE",
-    "BELIEVE",
-    "BETWEEN",
-    "CAPTAIN",
-    "CENTRAL",
-    "CERTAIN",
-    "COUNTRY",
-    "DECIDED",
-    "DURING",
-    "EXAMPLE",
-    "EXACTLY",
-    "FREEDOM",
-    "FRIENDS",
-    "GENERAL",
-    "HISTORY",
-    "HOWEVER",
-    "IMAGINE",
-    "IMPORTANT",
-    "INCLUDE",
-    "KITCHEN",
-    "LANGUAGE",
-    "MEETING",
-    "MORNING",
-    "NATURAL",
-    "NOTHING",
-    "PATTERN",
-    "PERFECT",
-    "PICTURE",
-    "POPULAR",
-    "PRESENT",
-    "PROBLEM",
-    "PROGRAM",
-    "PROMISE",
-    "RECEIVE",
-    "RESULTS",
-    "SCIENCE",
-    "SEVERAL",
-    "SPECIAL",
-    "STATION",
-    "STUDENT",
-    "SUPPORT",
-    "TEACHER",
-    "THOUGHT",
-    "TOGETHER",
-    "WITHOUT"
-  ])
+const WORD_DATA_PATHS = {
+  4: "data/words-4.json",
+  5: "data/words-5.json",
+  6: "data/words-6.json",
+  7: "data/words-7.json"
 };
 
 /* ------------------------------
@@ -259,39 +67,9 @@ let currentRow = 0;
 let currentTile = 0;
 let gameOver = false;
 
-/* ------------------------------
-   Randomness helpers
-   ------------------------------ */
-
-/*
-  Return a uniformly distributed random integer from
-  0 up to, but not including, max.
-
-  crypto.getRandomValues() obtains entropy from the
-  browser's secure random-number source.
-
-  Rejection sampling prevents modulo bias, ensuring
-  that every possible result has equal probability.
-*/
-function getSecureRandomInt(max) {
-  if (!Number.isInteger(max) || max <= 0) {
-    throw new Error(
-      "Random range must be a positive integer."
-    );
-  }
-
-  const maxUint32 = 0x100000000;
-  const limit =
-    maxUint32 - (maxUint32 % max);
-
-  const randomValues = new Uint32Array(1);
-
-  do {
-    crypto.getRandomValues(randomValues);
-  } while (randomValues[0] >= limit);
-
-  return randomValues[0] % max;
-}
+let dictionaries = {};
+let dictionariesLoaded = false;
+let dictionaryLoadFailed = false;
 
 /* ------------------------------
    Word-length helpers
@@ -302,12 +80,12 @@ function isSupportedWordLength(length) {
 }
 
 function getWordLengthWords() {
-  return developmentWords[WORD_LENGTH] || new Set();
+  return dictionaries[WORD_LENGTH] || new Set();
 }
 
 function getRandomWordLength() {
-  const randomIndex = getSecureRandomInt(
-    SUPPORTED_WORD_LENGTHS.length
+  const randomIndex = Math.floor(
+    Math.random() * SUPPORTED_WORD_LENGTHS.length
   );
 
   return SUPPORTED_WORD_LENGTHS[randomIndex];
@@ -318,6 +96,95 @@ function isRandomWordLengthSelected() {
     wordLengthSelect &&
     wordLengthSelect.value === RANDOM_WORD_LENGTH
   );
+}
+
+/* ------------------------------
+   Dictionary loading
+   ------------------------------ */
+
+function normaliseDictionaryWords(words) {
+  if (!Array.isArray(words)) {
+    return [];
+  }
+
+  return words
+    .filter((word) => typeof word === "string")
+    .map((word) => word.trim().toUpperCase())
+    .filter((word) => /^[A-Z]+$/.test(word));
+}
+
+async function loadDictionary(length) {
+  const path = WORD_DATA_PATHS[length];
+
+  if (!path) {
+    throw new Error(
+      `No dictionary path configured for ${length} letters.`
+    );
+  }
+
+  const response = await fetch(path, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Unable to load ${path}: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  const words = normaliseDictionaryWords(data);
+
+  if (words.length === 0) {
+    throw new Error(
+      `Dictionary for ${length} letters is empty or invalid.`
+    );
+  }
+
+  const correctlySizedWords = words.filter(
+    (word) => word.length === length
+  );
+
+  if (correctlySizedWords.length === 0) {
+    throw new Error(
+      `Dictionary for ${length} letters contains no correctly sized words.`
+    );
+  }
+
+  return new Set(correctlySizedWords);
+}
+
+async function loadDictionaries() {
+  const loadedDictionaries = {};
+
+  for (const length of SUPPORTED_WORD_LENGTHS) {
+    loadedDictionaries[length] =
+      await loadDictionary(length);
+  }
+
+  dictionaries = loadedDictionaries;
+  dictionariesLoaded = true;
+}
+
+function showDictionaryError(error) {
+  console.error(
+    "Dictionary loading failed:",
+    error
+  );
+
+  dictionaryLoadFailed = true;
+
+  showMessage(
+    "Unable to load the word dictionary. Please reload the page."
+  );
+
+  if (wordLengthSelect) {
+    wordLengthSelect.disabled = true;
+  }
+
+  if (newGameButton) {
+    newGameButton.disabled = true;
+  }
 }
 
 /* ------------------------------
@@ -333,21 +200,13 @@ function getRandomTargetWord() {
     return "";
   }
 
-  const randomIndex =
-    getSecureRandomInt(words.length);
+  const randomIndex = Math.floor(
+    Math.random() * words.length
+  );
 
   return words[randomIndex];
 }
 
-/*
-  Select a new random target from the word collection
-  for the currently selected word length.
-
-  The target is deliberately chosen independently from
-  the word-length selection so that Stage 13's Random
-  length mode and Stage 14's Random target mode work
-  together.
-*/
 function selectRandomTarget() {
   targetWord = getRandomTargetWord();
 }
@@ -409,8 +268,7 @@ function createBoard() {
       tileIndex < WORD_LENGTH;
       tileIndex += 1
     ) {
-      const tile =
-        document.createElement("div");
+      const tile = document.createElement("div");
 
       tile.className = "tile";
 
@@ -435,9 +293,16 @@ function createBoard() {
    ------------------------------ */
 
 function initialiseGame() {
+  if (
+    !dictionariesLoaded ||
+    dictionaryLoadFailed
+  ) {
+    return;
+  }
+
   /*
     In Random mode, choose a supported word length
-    every time a new game begins.
+    whenever a new game begins.
   */
   if (isRandomWordLengthSelected()) {
     WORD_LENGTH = getRandomWordLength();
@@ -458,11 +323,18 @@ function initialiseGame() {
   }
 
   /*
-    Stage 14:
-    Every new game receives a fresh random target from
-    the word collection for the selected length.
+    Every new game receives a new random target
+    from the dictionary for the selected length.
   */
   selectRandomTarget();
+
+  if (!targetWord) {
+    showMessage(
+      `No playable ${WORD_LENGTH}-letter words are available.`
+    );
+
+    return;
+  }
 
   createBoard();
   updateInstructions();
@@ -473,11 +345,11 @@ function initialiseGame() {
 
   if (isRandomWordLengthSelected()) {
     showMessage(
-      `Stage 14: Random ${WORD_LENGTH}-letter game`
+      `Stage 16: Random ${WORD_LENGTH}-letter game`
     );
   } else {
     showMessage(
-      `Stage 14: ${WORD_LENGTH}-letter game`
+      `Stage 16: ${WORD_LENGTH}-letter game`
     );
   }
 
@@ -485,14 +357,6 @@ function initialiseGame() {
     newGameButton.hidden = true;
   }
 }
-
-/*
-  Build the initial game.
-
-  This selects a random target instead of always
-  starting with CRANE.
-*/
-initialiseGame();
 
 /* ------------------------------
    Board helpers
@@ -585,7 +449,10 @@ function removeLetter() {
     tiles[currentTile].textContent = "";
 
     tiles[currentTile]
-      .removeAttribute("aria-label");
+      .setAttribute(
+        "aria-label",
+        `Guess ${currentRow + 1}, position ${currentTile + 1}: empty`
+      );
   }
 }
 
@@ -721,7 +588,11 @@ function endGame(won) {
    ------------------------------ */
 
 function submitGuess() {
-  if (gameOver) {
+  if (
+    gameOver ||
+    !dictionariesLoaded ||
+    dictionaryLoadFailed
+  ) {
     return;
   }
 
@@ -773,6 +644,13 @@ function submitGuess() {
    ------------------------------ */
 
 function startNewGame() {
+  if (
+    !dictionariesLoaded ||
+    dictionaryLoadFailed
+  ) {
+    return;
+  }
+
   initialiseGame();
 }
 
@@ -781,7 +659,11 @@ function startNewGame() {
    ------------------------------ */
 
 function handleWordLengthChange() {
-  if (!wordLengthSelect) {
+  if (
+    !wordLengthSelect ||
+    !dictionariesLoaded ||
+    dictionaryLoadFailed
+  ) {
     return;
   }
 
@@ -808,11 +690,8 @@ function handleWordLengthChange() {
   }
 
   /*
-    Changing word length starts a fresh game so
-    an old partially completed guess cannot be
-    mixed with the new length.
-
-    initialiseGame() also selects a new random target.
+    Changing word length starts a fresh game.
+    initialiseGame() also selects a new target.
   */
   initialiseGame();
 }
@@ -913,3 +792,32 @@ if (newGameButton) {
     startNewGame
   );
 }
+
+/* ------------------------------
+   Application startup
+   ------------------------------ */
+
+async function startApplication() {
+  showMessage(
+    "Loading word dictionary…"
+  );
+
+  if (wordLengthSelect) {
+    wordLengthSelect.disabled = true;
+  }
+
+  try {
+    await loadDictionaries();
+
+    if (wordLengthSelect) {
+      wordLengthSelect.disabled = false;
+    }
+
+    initialiseGame();
+  } catch (error) {
+    showDictionaryError(error);
+  }
+}
+
+startApplication();
+```
