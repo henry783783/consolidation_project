@@ -237,6 +237,45 @@ select {
   background: #aeb1b4;
 }
 
+.keyboard-row button.correct {
+  background: var(--correct-background);
+  color: var(--correct-text);
+}
+
+.keyboard-row button.present {
+  background: var(--present-background);
+  color: var(--present-text);
+}
+
+.keyboard-row button.absent {
+  background: var(--absent-background);
+  color: var(--absent-text);
+}
+
+.keyboard-row button.correct:hover {
+  background: var(--correct-background);
+}
+
+.keyboard-row button.present:hover {
+  background: var(--present-background);
+}
+
+.keyboard-row button.absent:hover {
+  background: var(--absent-background);
+}
+
+.keyboard-row button.correct:active {
+  background: var(--correct-background);
+}
+
+.keyboard-row button.present:active {
+  background: var(--present-background);
+}
+
+.keyboard-row button.absent:active {
+  background: var(--absent-background);
+}
+
 .keyboard-row button:focus-visible,
 #new-game:focus-visible {
   outline: 3px solid var(--focus-color);
