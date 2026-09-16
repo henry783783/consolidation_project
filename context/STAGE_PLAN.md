@@ -50,8 +50,6 @@
   - Added reduced-motion support.
   - Kept the existing three-file application structure.
 
-## Final stage
-
 - [x] Stage 9 — Final QA and documentation
   - Confirmed that the project remains compatible with static GitHub Pages hosting.
   - Confirmed that the application uses only HTML, CSS and vanilla JavaScript.
@@ -83,13 +81,13 @@ Replace the fixed CRANE target with random selection from the
 appropriate word collection. A new target must be selected
 whenever a new game begins, including when using New Game.
 
-[ ] Stage 15 — Dictionary/data design
+[X] Stage 15 — Dictionary/data design
 Establish the definition of an acceptable English word,
 identify a suitable legally redistributable English word
 dataset, and decide how target words and accepted guesses
 should be represented.
 
-[ ] Stage 16 — Expanded dictionary
+[X] Stage 16 — Expanded dictionary
 Replace the small development dictionary with the selected
 comprehensive word data, filtered and organised for the
 supported word lengths.
@@ -110,10 +108,4 @@ Review the complete game experience end-to-end, including
 starting a game, selecting a length, randomising length,
 making guesses, winning, losing, starting a new game and
 handling unexpected states. Fix only issues identified by
-this review.
-
-[ ] Stage 20 — Optional enhancements
-Review possible additional features such as statistics,
-sharing/results summaries, daily puzzles, hard mode, themes
-and other quality-of-life improvements. Implement only those
-explicitly approved after the core game is complete.
+this review. Make sure keyboard shows which letters have been tried as per the normal wordle game.
