@@ -16,9 +16,23 @@
   <main class="game">
     <header class="game-header">
       <h1>Wordle</h1>
+
       <p class="instructions">
-        Guess the five-letter word in six tries.
+        Guess the selected-length word in six tries.
       </p>
+
+      <div class="game-options">
+        <label for="word-length">
+          Word length
+        </label>
+
+        <select id="word-length">
+          <option value="4">4 letters</option>
+          <option value="5" selected>5 letters</option>
+          <option value="6">6 letters</option>
+          <option value="7">7 letters</option>
+        </select>
+      </div>
     </header>
 
     <section
@@ -26,11 +40,8 @@
       aria-label="Guess board"
     >
       <!--
-        The JavaScript creates the six guess rows and their tiles.
-
-        Keeping the board container in the HTML allows the game to
-        change the number of letters per row in future stages without
-        requiring a different HTML structure for each word length.
+        JavaScript creates the rows and tiles according to the
+        selected word length.
       -->
     </section>
 
@@ -102,7 +113,7 @@
       role="status"
       aria-live="polite"
     >
-      Stage 10: Dynamic word-length foundation
+      Stage 11: Word-length selection
     </p>
 
     <button
