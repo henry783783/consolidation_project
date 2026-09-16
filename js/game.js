@@ -70,6 +70,15 @@ const DEFAULT_WORD_LENGTH = 5;
 const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
+const KEYBOARD_STATE_PRIORITY = {
+  untried: 0,
+  absent: 1,
+  present: 2,
+  correct: 3
+};
+
+const keyboardStates = new Map();
+
 const BOARD_MAX_TILE_SIZE = 62;
 const BOARD_GAP_FALLBACK = 5;
 
@@ -180,6 +189,103 @@ function showMessage(message) {
     statusMessage.textContent = message;
   }
 }
+
+/* ------------------------------
+   Keyboard state
+   ------------------------------ */
+
+function getKeyboardStateDescription(state) {
+  switch (state) {
+    case "correct":
+      return "correct position";
+
+    case "present":
+      return "in the word, wrong position";
+
+    case "absent":
+      return "not in the word";
+
+    default:
+      return "not tried";
+  }
+}
+
+function renderKeyboardState() {
+  const buttons =
+    document.querySelectorAll(
+      ".keyboard button[data-key]"
+    );
+
+  buttons.forEach((button) => {
+    const key =
+      button.dataset.key.toUpperCase();
+
+    if (
+      key.length !== 1 ||
+      !/^[A-Z]$/.test(key)
+    ) {
+      return;
+    }
+
+    const state =
+      keyboardStates.get(key) ||
+      "untried";
+
+    button.classList.remove(
+      "correct",
+      "present",
+      "absent"
+    );
+
+    if (state !== "untried") {
+      button.classList.add(state);
+    }
+
+    button.setAttribute(
+      "aria-label",
+      `${key} — ${getKeyboardStateDescription(state)}`
+    );
+  });
+}
+
+function resetKeyboardState() {
+  keyboardStates.clear();
+
+  renderKeyboardState();
+}
+
+function updateKeyboardState(
+  guess,
+  results
+) {
+  guess
+    .split("")
+    .forEach((letter, index) => {
+      const key =
+        letter.toUpperCase();
+
+      const result =
+        results[index];
+
+      if (
+        !KEYBOARD_STATE_PRIORITY.hasOwnProperty(
+          result
+        )
+      ) {
+        return;
+      }
+
+      const currentState =
+        keyboardStates.get(key) ||
+        "untried";
+
+      const currentPriority =
+        KEYBOARD_STATE_PRIORITY[
+          currentState
+        ];
+
+      const newPriority =
+       
 
 /* --------------------------------
    Word-length helpers
