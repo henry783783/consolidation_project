@@ -1,18 +1,25 @@
 /*
   Wordle-style game
-  Stage 8: Polish and accessibility
+  Stage 10: Dynamic word-length foundation
 
   This file controls:
+  - Dynamic board creation.
   - Physical keyboard input.
   - On-screen keyboard input.
   - Backspace.
-  - Five-letter guess validation.
+  - Guess validation.
   - Wordle-style letter evaluation.
   - Accessible descriptions for evaluated tiles.
   - Win/loss detection.
   - New-game/reset behaviour.
 
-  The target remains fixed as CRANE during development.
+  IMPORTANT:
+  The game currently remains a five-letter game with CRANE as the
+  fixed development target.
+
+  WORD_LENGTH is now the single source of truth for the number of
+  letters in a word. Future stages can change this value or make it
+  selectable without rebuilding the board HTML manually.
 */
 
 "use strict";
@@ -27,7 +34,7 @@ const targetWord = "CRANE";
 
 /*
   Small development dictionary.
-  Only five-letter words are accepted as guesses.
+  Only five-letter words are accepted as guesses at this stage.
 */
 const allowedWords = new Set([
   "ABOUT", "ABOVE", "AFTER", "AGAIN", "ALONE", "APPLE",
@@ -80,23 +87,72 @@ const allowedWords = new Set([
    Page elements and game state
    ------------------------------ */
 
-const rows = document.querySelectorAll(".row");
+const board = document.querySelector(".board");
 const statusMessage = document.querySelector(".stage-status");
 const newGameButton = document.querySelector("#new-game");
+
+let rows = [];
+let currentRow = 0;
+let currentTile = 0;
+let gameOver = false;
+
+/* ------------------------------
+   Board creation
+   ------------------------------ */
+
+/*
+  Create the board from WORD_LENGTH instead of relying on hard-coded
+  tile elements in index.html.
+
+  This is deliberately kept as a small function so future stages can
+  change WORD_LENGTH without needing to redesign the rest of the game.
+*/
+function createBoard() {
+  if (!board) {
+    return;
+  }
+
+  board.innerHTML = "";
+
+  for (let rowIndex = 0; rowIndex < MAX_GUESSES; rowIndex += 1) {
+    const row = document.createElement("div");
+
+    row.className = "row";
+    row.setAttribute("aria-label", `Guess ${rowIndex + 1}`);
+    row.style.setProperty("--word-length", WORD_LENGTH);
+
+    for (let tileIndex = 0; tileIndex < WORD_LENGTH; tileIndex += 1) {
+      const tile = document.createElement("div");
+
+      tile.className = "tile";
+      tile.setAttribute(
+        "aria-label",
+        `Guess ${rowIndex + 1}, position ${tileIndex + 1}: empty`
+      );
+
+      row.appendChild(tile);
+    }
+
+    board.appendChild(row);
+  }
+
+  rows = Array.from(board.querySelectorAll(".row"));
+}
+
+/*
+  Build the board before any input can occur.
+*/
+createBoard();
 
 /*
   Establish the initial UI state explicitly.
 
-  This ensures the New Game button starts hidden even
-  if a browser has retained an older stylesheet.
+  This ensures the New Game button starts hidden even if a browser
+  has retained an older stylesheet or page state.
 */
 if (newGameButton) {
   newGameButton.hidden = true;
 }
-
-let currentRow = 0;
-let currentTile = 0;
-let gameOver = false;
 
 /* ------------------------------
    Board helpers
@@ -128,7 +184,7 @@ function showMessage(message) {
 }
 
 /*
-  Give a typed tile a useful accessible description.
+  Give a tile a useful accessible description.
 
   The visible letter remains unchanged. The aria-label gives
   assistive technology enough information to understand the
@@ -247,6 +303,10 @@ function getResultDescription(result) {
 }
 
 function displayEvaluation(results, rowIndex) {
+  if (!rows[rowIndex]) {
+    return;
+  }
+
   const tiles = Array.from(
     rows[rowIndex].querySelectorAll(".tile")
   ).slice(0, WORD_LENGTH);
@@ -340,21 +400,17 @@ function submitGuess() {
    ------------------------------ */
 
 function startNewGame() {
-  rows.forEach((row) => {
-    const tiles = row.querySelectorAll(".tile");
-
-    tiles.forEach((tile) => {
-      tile.textContent = "";
-      tile.removeAttribute("aria-label");
-      tile.classList.remove("correct", "present", "absent");
-    });
-  });
+  /*
+    Rebuild the board so the reset behaviour is also compatible
+    with future word-length changes.
+  */
+  createBoard();
 
   currentRow = 0;
   currentTile = 0;
   gameOver = false;
 
-  showMessage("Stage 8: Polish and accessibility");
+  showMessage("Stage 10: Dynamic word-length foundation");
 
   if (newGameButton) {
     newGameButton.hidden = true;
