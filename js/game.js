@@ -48,7 +48,7 @@ const WORD_DATA_PATHS = {
 };
 
 /* ------------------------------
-   Page elements and game state
+   Page elements
    ------------------------------ */
 
 const board = document.querySelector(".board");
@@ -58,6 +58,10 @@ const newGameButton =
   document.querySelector("#new-game");
 const wordLengthSelect =
   document.querySelector("#word-length");
+
+/* ------------------------------
+   Game state
+   ------------------------------ */
 
 let WORD_LENGTH = DEFAULT_WORD_LENGTH;
 let targetWord = "";
@@ -99,6 +103,16 @@ function isRandomWordLengthSelected() {
 }
 
 /* ------------------------------
+   Status messages
+   ------------------------------ */
+
+function showMessage(message) {
+  if (statusMessage) {
+    statusMessage.textContent = message;
+  }
+}
+
+/* ------------------------------
    Dictionary loading
    ------------------------------ */
 
@@ -108,13 +122,21 @@ function normaliseDictionaryWords(words) {
   }
 
   return words
-    .filter((word) => typeof word === "string")
-    .map((word) => word.trim().toUpperCase())
-    .filter((word) => /^[A-Z]+$/.test(word));
+    .filter(
+      (word) =>
+        typeof word === "string"
+    )
+    .map((word) =>
+      word.trim().toUpperCase()
+    )
+    .filter((word) =>
+      /^[A-Z]+$/.test(word)
+    );
 }
 
 async function loadDictionary(length) {
-  const path = WORD_DATA_PATHS[length];
+  const path =
+    WORD_DATA_PATHS[length];
 
   if (!path) {
     throw new Error(
@@ -122,9 +144,7 @@ async function loadDictionary(length) {
     );
   }
 
-  const response = await fetch(path, {
-    cache: "no-store"
-  });
+  const response = await fetch(path);
 
   if (!response.ok) {
     throw new Error(
@@ -132,43 +152,58 @@ async function loadDictionary(length) {
     );
   }
 
-  const data = await response.json();
-  const words = normaliseDictionaryWords(data);
+  const data =
+    await response.json();
 
-  if (words.length === 0) {
+  const words =
+    normaliseDictionaryWords(data);
+
+  const correctlySizedWords =
+    words.filter(
+      (word) =>
+        word.length === length
+    );
+
+  if (
+    correctlySizedWords.length === 0
+  ) {
     throw new Error(
-      `Dictionary for ${length} letters is empty or invalid.`
+      `Dictionary ${path} contains no valid ${length}-letter words.`
     );
   }
 
-  const correctlySizedWords = words.filter(
-    (word) => word.length === length
+  return new Set(
+    correctlySizedWords
   );
-
-  if (correctlySizedWords.length === 0) {
-    throw new Error(
-      `Dictionary for ${length} letters contains no correctly sized words.`
-    );
-  }
-
-  return new Set(correctlySizedWords);
 }
 
 async function loadDictionaries() {
-  const loadedDictionaries = {};
+  const results =
+    await Promise.all(
+      SUPPORTED_WORD_LENGTHS.map(
+        async (length) => {
+          const dictionary =
+            await loadDictionary(length);
 
-  for (const length of SUPPORTED_WORD_LENGTHS) {
-    loadedDictionaries[length] =
-      await loadDictionary(length);
-  }
+          return [
+            length,
+            dictionary
+          ];
+        }
+      )
+    );
 
-  dictionaries = loadedDictionaries;
+  dictionaries =
+    Object.fromEntries(results);
+
   dictionariesLoaded = true;
 }
 
-function showDictionaryError(error) {
+function handleDictionaryLoadFailure(
+  error
+) {
   console.error(
-    "Dictionary loading failed:",
+    "Stage 16 dictionary loading failed:",
     error
   );
 
@@ -192,32 +227,38 @@ function showDictionaryError(error) {
    ------------------------------ */
 
 function getRandomTargetWord() {
-  const words = Array.from(
-    getWordLengthWords()
-  );
+  const words =
+    Array.from(
+      getWordLengthWords()
+    );
 
   if (words.length === 0) {
     return "";
   }
 
-  const randomIndex = Math.floor(
-    Math.random() * words.length
-  );
+  const randomIndex =
+    Math.floor(
+      Math.random() *
+        words.length
+    );
 
   return words[randomIndex];
 }
 
 function selectRandomTarget() {
-  targetWord = getRandomTargetWord();
+  targetWord =
+    getRandomTargetWord();
 }
 
 /* ------------------------------
-   Instructions and messages
+   Instructions
    ------------------------------ */
 
 function updateInstructions() {
   const instructions =
-    document.querySelector(".instructions");
+    document.querySelector(
+      ".instructions"
+    );
 
   if (!instructions) {
     return;
@@ -225,12 +266,6 @@ function updateInstructions() {
 
   instructions.textContent =
     `Guess the ${WORD_LENGTH}-letter word in six tries.`;
-}
-
-function showMessage(message) {
-  if (statusMessage) {
-    statusMessage.textContent = message;
-  }
 }
 
 /* ------------------------------
@@ -249,7 +284,10 @@ function createBoard() {
     rowIndex < MAX_GUESSES;
     rowIndex += 1
   ) {
-    const row = document.createElement("div");
+    const row =
+      document.createElement(
+        "div"
+      );
 
     row.className = "row";
 
@@ -268,7 +306,10 @@ function createBoard() {
       tileIndex < WORD_LENGTH;
       tileIndex += 1
     ) {
-      const tile = document.createElement("div");
+      const tile =
+        document.createElement(
+          "div"
+        );
 
       tile.className = "tile";
 
@@ -283,9 +324,12 @@ function createBoard() {
     board.appendChild(row);
   }
 
-  rows = Array.from(
-    board.querySelectorAll(".row")
-  );
+  rows =
+    Array.from(
+      board.querySelectorAll(
+        ".row"
+      )
+    );
 }
 
 /* ------------------------------
@@ -301,30 +345,44 @@ function initialiseGame() {
   }
 
   /*
-    In Random mode, choose a supported word length
-    whenever a new game begins.
+    Random mode selects a new supported
+    length whenever a new game begins.
   */
-  if (isRandomWordLengthSelected()) {
-    WORD_LENGTH = getRandomWordLength();
+  if (
+    isRandomWordLengthSelected()
+  ) {
+    WORD_LENGTH =
+      getRandomWordLength();
   } else {
     const selectedLength =
-      Number(wordLengthSelect.value);
+      Number(
+        wordLengthSelect.value
+      );
 
-    if (isSupportedWordLength(selectedLength)) {
-      WORD_LENGTH = selectedLength;
+    if (
+      isSupportedWordLength(
+        selectedLength
+      )
+    ) {
+      WORD_LENGTH =
+        selectedLength;
     } else {
-      WORD_LENGTH = DEFAULT_WORD_LENGTH;
+      WORD_LENGTH =
+        DEFAULT_WORD_LENGTH;
 
       if (wordLengthSelect) {
         wordLengthSelect.value =
-          String(DEFAULT_WORD_LENGTH);
+          String(
+            DEFAULT_WORD_LENGTH
+          );
       }
     }
   }
 
   /*
-    Every new game receives a new random target
-    from the dictionary for the selected length.
+    Every new game gets a new
+    random target from the selected
+    length's dictionary.
   */
   selectRandomTarget();
 
@@ -343,7 +401,9 @@ function initialiseGame() {
   currentTile = 0;
   gameOver = false;
 
-  if (isRandomWordLengthSelected()) {
+  if (
+    isRandomWordLengthSelected()
+  ) {
     showMessage(
       `Stage 16: Random ${WORD_LENGTH}-letter game`
     );
@@ -368,17 +428,27 @@ function getCurrentRowTiles() {
   }
 
   return Array.from(
-    rows[currentRow].querySelectorAll(".tile")
-  ).slice(0, WORD_LENGTH);
+    rows[currentRow]
+      .querySelectorAll(".tile")
+  ).slice(
+    0,
+    WORD_LENGTH
+  );
 }
 
 function getCurrentGuess() {
-  const tiles = getCurrentRowTiles();
+  const tiles =
+    getCurrentRowTiles();
 
   return tiles
-    .slice(0, currentTile)
+    .slice(
+      0,
+      currentTile
+    )
     .map((tile) =>
-      tile.textContent.trim().toUpperCase()
+      tile.textContent
+        .trim()
+        .toUpperCase()
     )
     .join("");
 }
@@ -411,7 +481,8 @@ function addLetter(letter) {
     return;
   }
 
-  const tiles = getCurrentRowTiles();
+  const tiles =
+    getCurrentRowTiles();
 
   if (!tiles[currentTile]) {
     return;
@@ -420,7 +491,8 @@ function addLetter(letter) {
   const upperLetter =
     letter.toUpperCase();
 
-  tiles[currentTile].textContent =
+  tiles[currentTile]
+    .textContent =
     upperLetter;
 
   updateTileInputLabel(
@@ -443,10 +515,12 @@ function removeLetter() {
 
   currentTile -= 1;
 
-  const tiles = getCurrentRowTiles();
+  const tiles =
+    getCurrentRowTiles();
 
   if (tiles[currentTile]) {
-    tiles[currentTile].textContent = "";
+    tiles[currentTile]
+      .textContent = "";
 
     tiles[currentTile]
       .setAttribute(
@@ -457,7 +531,9 @@ function removeLetter() {
 }
 
 function handleLetter(letter) {
-  if (/^[a-zA-Z]$/.test(letter)) {
+  if (
+    /^[a-zA-Z]$/.test(letter)
+  ) {
     addLetter(letter);
   }
 }
@@ -468,14 +544,15 @@ function handleLetter(letter) {
 
 function evaluateGuess(guess) {
   const results =
-    Array(WORD_LENGTH).fill("absent");
+    Array(WORD_LENGTH)
+      .fill("absent");
 
   const remainingTargetLetters =
     targetWord.split("");
 
   /*
     First pass:
-    exact matches are marked correct and consumed.
+    exact matches.
   */
   for (
     let index = 0;
@@ -483,18 +560,20 @@ function evaluateGuess(guess) {
     index += 1
   ) {
     if (
-      guess[index] === targetWord[index]
+      guess[index] ===
+      targetWord[index]
     ) {
-      results[index] = "correct";
+      results[index] =
+        "correct";
 
-      remainingTargetLetters[index] =
-        null;
+      remainingTargetLetters[
+        index
+      ] = null;
     }
   }
 
   /*
     Second pass:
-    remaining letters are checked for
     wrong-position matches.
   */
   for (
@@ -502,32 +581,46 @@ function evaluateGuess(guess) {
     index < WORD_LENGTH;
     index += 1
   ) {
-    if (results[index] === "correct") {
+    if (
+      results[index] ===
+      "correct"
+    ) {
       continue;
     }
 
     const matchingIndex =
-      remainingTargetLetters.indexOf(
-        guess[index]
-      );
+      remainingTargetLetters
+        .indexOf(
+          guess[index]
+        );
 
-    if (matchingIndex !== -1) {
-      results[index] = "present";
+    if (
+      matchingIndex !== -1
+    ) {
+      results[index] =
+        "present";
 
-      remainingTargetLetters[matchingIndex] =
-        null;
+      remainingTargetLetters[
+        matchingIndex
+      ] = null;
     }
   }
 
   return results;
 }
 
-function getResultDescription(result) {
-  if (result === "correct") {
+function getResultDescription(
+  result
+) {
+  if (
+    result === "correct"
+  ) {
     return "correct position";
   }
 
-  if (result === "present") {
+  if (
+    result === "present"
+  ) {
     return "correct letter, wrong position";
   }
 
@@ -542,25 +635,39 @@ function displayEvaluation(
     return;
   }
 
-  const tiles = Array.from(
-    rows[rowIndex].querySelectorAll(".tile")
-  ).slice(0, WORD_LENGTH);
-
-  results.forEach((result, index) => {
-    if (!tiles[index]) {
-      return;
-    }
-
-    const letter =
-      tiles[index].textContent.trim();
-
-    tiles[index].classList.add(result);
-
-    tiles[index].setAttribute(
-      "aria-label",
-      `Guess ${rowIndex + 1}, position ${index + 1}: ${letter}, ${getResultDescription(result)}`
+  const tiles =
+    Array.from(
+      rows[rowIndex]
+        .querySelectorAll(
+          ".tile"
+        )
+    ).slice(
+      0,
+      WORD_LENGTH
     );
-  });
+
+  results.forEach(
+    (result, index) => {
+      if (!tiles[index]) {
+        return;
+      }
+
+      const letter =
+        tiles[index]
+          .textContent
+          .trim();
+
+      tiles[index]
+        .classList
+        .add(result);
+
+      tiles[index]
+        .setAttribute(
+          "aria-label",
+          `Guess ${rowIndex + 1}, position ${index + 1}: ${letter}, ${getResultDescription(result)}`
+        );
+    }
+  );
 }
 
 /* ------------------------------
@@ -571,7 +678,9 @@ function endGame(won) {
   gameOver = true;
 
   if (won) {
-    showMessage("You win!");
+    showMessage(
+      "You win!"
+    );
   } else {
     showMessage(
       `Game over — the word was ${targetWord}.`
@@ -579,7 +688,8 @@ function endGame(won) {
   }
 
   if (newGameButton) {
-    newGameButton.hidden = false;
+    newGameButton.hidden =
+      false;
   }
 }
 
@@ -596,44 +706,70 @@ function submitGuess() {
     return;
   }
 
-  if (currentTile !== WORD_LENGTH) {
-    showMessage("Not enough letters");
+  if (
+    currentTile !==
+    WORD_LENGTH
+  ) {
+    showMessage(
+      "Not enough letters"
+    );
+
     return;
   }
 
-  const guess = getCurrentGuess();
+  const guess =
+    getCurrentGuess();
 
-  if (guess.length !== WORD_LENGTH) {
-    showMessage("Not enough letters");
+  if (
+    guess.length !==
+    WORD_LENGTH
+  ) {
+    showMessage(
+      "Not enough letters"
+    );
+
     return;
   }
 
-  if (!getWordLengthWords().has(guess)) {
-    showMessage("Word not in list");
+  if (
+    !getWordLengthWords()
+      .has(guess)
+  ) {
+    showMessage(
+      "Word not in list"
+    );
+
     return;
   }
 
   const results =
-    evaluateGuess(guess);
+    evaluateGuess(
+      guess
+    );
 
   displayEvaluation(
     results,
     currentRow
   );
 
-  if (guess === targetWord) {
+  if (
+    guess === targetWord
+  ) {
     endGame(true);
     return;
   }
 
   if (
-    currentRow === MAX_GUESSES - 1
+    currentRow ===
+    MAX_GUESSES - 1
   ) {
     endGame(false);
     return;
   }
 
-  showMessage("Guess evaluated");
+  showMessage(
+    "Guess evaluated"
+  );
 
   currentRow += 1;
   currentTile = 0;
@@ -671,7 +807,8 @@ function handleWordLengthChange() {
     wordLengthSelect.value;
 
   if (
-    selectedValue === RANDOM_WORD_LENGTH
+    selectedValue ===
+    RANDOM_WORD_LENGTH
   ) {
     initialiseGame();
     return;
@@ -680,19 +817,23 @@ function handleWordLengthChange() {
   const selectedLength =
     Number(selectedValue);
 
-  if (!isSupportedWordLength(selectedLength)) {
+  if (
+    !isSupportedWordLength(
+      selectedLength
+    )
+  ) {
     wordLengthSelect.value =
-      String(DEFAULT_WORD_LENGTH);
+      String(
+        DEFAULT_WORD_LENGTH
+      );
 
-    WORD_LENGTH = DEFAULT_WORD_LENGTH;
+    WORD_LENGTH =
+      DEFAULT_WORD_LENGTH;
   } else {
-    WORD_LENGTH = selectedLength;
+    WORD_LENGTH =
+      selectedLength;
   }
 
-  /*
-    Changing word length starts a fresh game.
-    initialiseGame() also selects a new target.
-  */
   initialiseGame();
 }
 
@@ -708,12 +849,16 @@ if (wordLengthSelect) {
    ------------------------------ */
 
 function handleAction(action) {
-  if (action === "backspace") {
+  if (
+    action === "backspace"
+  ) {
     removeLetter();
     return;
   }
 
-  if (action === "enter") {
+  if (
+    action === "enter"
+  ) {
     submitGuess();
   }
 }
@@ -733,21 +878,41 @@ document.addEventListener(
       return;
     }
 
-    if (event.key === "Backspace") {
+    if (
+      event.key ===
+      "Backspace"
+    ) {
       event.preventDefault();
-      handleAction("backspace");
+
+      handleAction(
+        "backspace"
+      );
+
       return;
     }
 
-    if (event.key === "Enter") {
+    if (
+      event.key === "Enter"
+    ) {
       event.preventDefault();
-      handleAction("enter");
+
+      handleAction(
+        "enter"
+      );
+
       return;
     }
 
-    if (/^[a-zA-Z]$/.test(event.key)) {
+    if (
+      /^[a-zA-Z]$/.test(
+        event.key
+      )
+    ) {
       event.preventDefault();
-      handleLetter(event.key);
+
+      handleLetter(
+        event.key
+      );
     }
   }
 );
@@ -768,7 +933,8 @@ document.addEventListener(
       return;
     }
 
-    const key = button.dataset.key;
+    const key =
+      button.dataset.key;
 
     if (
       key === "enter" ||
@@ -803,19 +969,23 @@ async function startApplication() {
   );
 
   if (wordLengthSelect) {
-    wordLengthSelect.disabled = true;
+    wordLengthSelect.disabled =
+      true;
   }
 
   try {
     await loadDictionaries();
 
     if (wordLengthSelect) {
-      wordLengthSelect.disabled = false;
+      wordLengthSelect.disabled =
+        false;
     }
 
     initialiseGame();
   } catch (error) {
-    showDictionaryError(error);
+    handleDictionaryLoadFailure(
+      error
+    );
   }
 }
 
