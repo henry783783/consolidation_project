@@ -1,9 +1,9 @@
 /*
   Wordle-style game
-  Stage 11: Supported word-length selection
+  Stage 13: Random word-length mode
 
   This file controls:
-  - Word-length selection.
+  - Fixed and random word-length selection.
   - Dynamic board creation.
   - Physical keyboard input.
   - On-screen keyboard input.
@@ -21,9 +21,8 @@
   collections. Stage 14 will replace them with the project's
   comprehensive English word dataset.
 
-  Random target selection is intentionally NOT implemented yet.
-  Each length currently has a fixed development target so this
-  stage remains predictable and independently testable.
+  Target selection remains deterministic at this stage.
+  Stage 14 will introduce random target selection.
 */
 
 "use strict";
@@ -34,14 +33,15 @@
 
 const SUPPORTED_WORD_LENGTHS = [4, 5, 6, 7];
 const DEFAULT_WORD_LENGTH = 5;
+const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
 /*
   Small development word collections.
 
-  These allow the newly supported lengths to be tested without
-  introducing the comprehensive dictionary before its dedicated
-  stages.
+  These allow the supported lengths to be tested without
+  introducing the comprehensive dictionary before its
+  dedicated stages.
 */
 const developmentWords = {
   4: new Set([
@@ -235,8 +235,8 @@ const developmentWords = {
 /*
   Fixed development target for each supported length.
 
-  This is deliberately deterministic. Stage 14 will replace
-  this mechanism with random target selection.
+  These remain deterministic during Stage 13.
+  Stage 14 will replace this mechanism with random targets.
 */
 const developmentTargets = {
   4: "STAR",
@@ -274,8 +274,22 @@ function getWordLengthWords() {
   return developmentWords[WORD_LENGTH] || new Set();
 }
 
+function getRandomWordLength() {
+  const randomIndex = Math.floor(
+    Math.random() * SUPPORTED_WORD_LENGTHS.length
+  );
+
+  return SUPPORTED_WORD_LENGTHS[randomIndex];
+}
+
+function isRandomWordLengthSelected() {
+  return wordLengthSelect &&
+    wordLengthSelect.value === RANDOM_WORD_LENGTH;
+}
+
 function updateInstructions() {
-  const instructions = document.querySelector(".instructions");
+  const instructions =
+    document.querySelector(".instructions");
 
   if (!instructions) {
     return;
@@ -296,12 +310,23 @@ function createBoard() {
 
   board.innerHTML = "";
 
-  for (let rowIndex = 0; rowIndex < MAX_GUESSES; rowIndex += 1) {
+  for (
+    let rowIndex = 0;
+    rowIndex < MAX_GUESSES;
+    rowIndex += 1
+  ) {
     const row = document.createElement("div");
 
     row.className = "row";
-    row.setAttribute("aria-label", `Guess ${rowIndex + 1}`);
-    row.style.setProperty("--word-length", WORD_LENGTH);
+    row.setAttribute(
+      "aria-label",
+      `Guess ${rowIndex + 1}`
+    );
+
+    row.style.setProperty(
+      "--word-length",
+      WORD_LENGTH
+    );
 
     for (
       let tileIndex = 0;
@@ -322,7 +347,9 @@ function createBoard() {
     board.appendChild(row);
   }
 
-  rows = Array.from(board.querySelectorAll(".row"));
+  rows = Array.from(
+    board.querySelectorAll(".row")
+  );
 }
 
 /* ------------------------------
@@ -330,6 +357,32 @@ function createBoard() {
    ------------------------------ */
 
 function initialiseGame() {
+  /*
+    In Random mode, choose a supported word length every
+    time a new game begins.
+  */
+  if (isRandomWordLengthSelected()) {
+    WORD_LENGTH = getRandomWordLength();
+  } else {
+    const selectedLength =
+      Number(wordLengthSelect.value);
+
+    if (isSupportedWordLength(selectedLength)) {
+      WORD_LENGTH = selectedLength;
+    } else {
+      WORD_LENGTH = DEFAULT_WORD_LENGTH;
+
+      if (wordLengthSelect) {
+        wordLengthSelect.value =
+          String(DEFAULT_WORD_LENGTH);
+      }
+    }
+  }
+
+  /*
+    Stage 13 deliberately keeps the target deterministic
+    for each selected length. Stage 14 will randomise it.
+  */
   targetWord = developmentTargets[WORD_LENGTH];
 
   createBoard();
@@ -339,9 +392,15 @@ function initialiseGame() {
   currentTile = 0;
   gameOver = false;
 
-  showMessage(
-    `Stage 11: ${WORD_LENGTH}-letter game`
-  );
+  if (isRandomWordLengthSelected()) {
+    showMessage(
+      `Stage 13: Random ${WORD_LENGTH}-letter game`
+    );
+  } else {
+    showMessage(
+      `Stage 13: ${WORD_LENGTH}-letter game`
+    );
+  }
 
   if (newGameButton) {
     newGameButton.hidden = true;
@@ -372,7 +431,9 @@ function getCurrentGuess() {
 
   return tiles
     .slice(0, currentTile)
-    .map((tile) => tile.textContent.trim().toUpperCase())
+    .map((tile) =>
+      tile.textContent.trim().toUpperCase()
+    )
     .join("");
 }
 
@@ -403,7 +464,10 @@ function updateTileInputLabel(
    ------------------------------ */
 
 function addLetter(letter) {
-  if (gameOver || currentTile >= WORD_LENGTH) {
+  if (
+    gameOver ||
+    currentTile >= WORD_LENGTH
+  ) {
     return;
   }
 
@@ -413,9 +477,11 @@ function addLetter(letter) {
     return;
   }
 
-  const upperLetter = letter.toUpperCase();
+  const upperLetter =
+    letter.toUpperCase();
 
-  tiles[currentTile].textContent = upperLetter;
+  tiles[currentTile].textContent =
+    upperLetter;
 
   updateTileInputLabel(
     tiles[currentTile],
@@ -428,7 +494,10 @@ function addLetter(letter) {
 }
 
 function removeLetter() {
-  if (gameOver || currentTile <= 0) {
+  if (
+    gameOver ||
+    currentTile <= 0
+  ) {
     return;
   }
 
@@ -438,7 +507,8 @@ function removeLetter() {
 
   if (tiles[currentTile]) {
     tiles[currentTile].textContent = "";
-    tiles[currentTile].removeAttribute("aria-label");
+    tiles[currentTile]
+      .removeAttribute("aria-label");
   }
 }
 
@@ -453,35 +523,53 @@ function handleLetter(letter) {
    ------------------------------ */
 
 function evaluateGuess(guess) {
-  const results = Array(WORD_LENGTH).fill("absent");
-  const remainingTargetLetters = targetWord.split("");
+  const results =
+    Array(WORD_LENGTH).fill("absent");
+
+  const remainingTargetLetters =
+    targetWord.split("");
 
   /*
     First pass:
     exact matches are marked correct and consumed.
   */
-  for (let index = 0; index < WORD_LENGTH; index += 1) {
-    if (guess[index] === targetWord[index]) {
+  for (
+    let index = 0;
+    index < WORD_LENGTH;
+    index += 1
+  ) {
+    if (
+      guess[index] === targetWord[index]
+    ) {
       results[index] = "correct";
-      remainingTargetLetters[index] = null;
+      remainingTargetLetters[index] =
+        null;
     }
   }
 
   /*
     Second pass:
-    remaining letters are checked for wrong-position matches.
+    remaining letters are checked for
+    wrong-position matches.
   */
-  for (let index = 0; index < WORD_LENGTH; index += 1) {
+  for (
+    let index = 0;
+    index < WORD_LENGTH;
+    index += 1
+  ) {
     if (results[index] === "correct") {
       continue;
     }
 
     const matchingIndex =
-      remainingTargetLetters.indexOf(guess[index]);
+      remainingTargetLetters.indexOf(
+        guess[index]
+      );
 
     if (matchingIndex !== -1) {
       results[index] = "present";
-      remainingTargetLetters[matchingIndex] = null;
+      remainingTargetLetters[matchingIndex] =
+        null;
     }
   }
 
@@ -500,7 +588,10 @@ function getResultDescription(result) {
   return "letter not present";
 }
 
-function displayEvaluation(results, rowIndex) {
+function displayEvaluation(
+  results,
+  rowIndex
+) {
   if (!rows[rowIndex]) {
     return;
   }
@@ -514,7 +605,8 @@ function displayEvaluation(results, rowIndex) {
       return;
     }
 
-    const letter = tiles[index].textContent.trim();
+    const letter =
+      tiles[index].textContent.trim();
 
     tiles[index].classList.add(result);
 
@@ -535,7 +627,9 @@ function endGame(won) {
   if (won) {
     showMessage("You win!");
   } else {
-    showMessage(`Game over — the word was ${targetWord}.`);
+    showMessage(
+      `Game over — the word was ${targetWord}.`
+    );
   }
 
   if (newGameButton) {
@@ -569,16 +663,22 @@ function submitGuess() {
     return;
   }
 
-  const results = evaluateGuess(guess);
+  const results =
+    evaluateGuess(guess);
 
-  displayEvaluation(results, currentRow);
+  displayEvaluation(
+    results,
+    currentRow
+  );
 
   if (guess === targetWord) {
     endGame(true);
     return;
   }
 
-  if (currentRow === MAX_GUESSES - 1) {
+  if (
+    currentRow === MAX_GUESSES - 1
+  ) {
     endGame(false);
     return;
   }
@@ -606,18 +706,36 @@ function handleWordLengthChange() {
     return;
   }
 
-  const selectedLength = Number(wordLengthSelect.value);
+  const selectedValue =
+    wordLengthSelect.value;
+
+  if (
+    selectedValue === RANDOM_WORD_LENGTH
+  ) {
+    /*
+      initialiseGame() chooses the actual
+      random supported length.
+    */
+    initialiseGame();
+    return;
+  }
+
+  const selectedLength =
+    Number(selectedValue);
 
   if (!isSupportedWordLength(selectedLength)) {
-    wordLengthSelect.value = String(DEFAULT_WORD_LENGTH);
+    wordLengthSelect.value =
+      String(DEFAULT_WORD_LENGTH);
+
     WORD_LENGTH = DEFAULT_WORD_LENGTH;
   } else {
     WORD_LENGTH = selectedLength;
   }
 
   /*
-    Changing word length starts a fresh game so that an old
-    partially completed guess cannot be mixed with the new length.
+    Changing word length starts a fresh game so
+    an old partially completed guess cannot be
+    mixed with the new length.
   */
   initialiseGame();
 }
@@ -648,51 +766,65 @@ function handleAction(action) {
    Physical keyboard
    ------------------------------ */
 
-document.addEventListener("keydown", (event) => {
-  if (event.ctrlKey || event.metaKey || event.altKey) {
-    return;
-  }
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey
+    ) {
+      return;
+    }
 
-  if (event.key === "Backspace") {
-    event.preventDefault();
-    handleAction("backspace");
-    return;
-  }
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      handleAction("backspace");
+      return;
+    }
 
-  if (event.key === "Enter") {
-    event.preventDefault();
-    handleAction("enter");
-    return;
-  }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleAction("enter");
+      return;
+    }
 
-  if (/^[a-zA-Z]$/.test(event.key)) {
-    event.preventDefault();
-    handleLetter(event.key);
+    if (/^[a-zA-Z]$/.test(event.key)) {
+      event.preventDefault();
+      handleLetter(event.key);
+    }
   }
-});
+);
 
 /* ------------------------------
    On-screen keyboard
    ------------------------------ */
 
-document.addEventListener("click", (event) => {
-  const button = event.target.closest(
-    "button[data-key]"
-  );
+document.addEventListener(
+  "click",
+  (event) => {
+    const button =
+      event.target.closest(
+        "button[data-key]"
+      );
 
-  if (!button) {
-    return;
+    if (!button) {
+      return;
+    }
+
+    const key = button.dataset.key;
+
+    if (
+      key === "enter" ||
+      key === "backspace"
+    ) {
+      handleAction(key);
+      return;
+    }
+
+    handleLetter(key);
   }
-
-  const key = button.dataset.key;
-
-  if (key === "enter" || key === "backspace") {
-    handleAction(key);
-    return;
-  }
-
-  handleLetter(key);
-});
+);
 
 /* ------------------------------
    New Game button
