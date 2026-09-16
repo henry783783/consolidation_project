@@ -9,9 +9,9 @@
 │   ├── DECISIONS.md
 │   ├── GUARDRAILS.md
 │   ├── PROJECT_BRIEF.md
-│   ├── PROMPT_LOG.md
+│   ├── PROMPT_LOGS.md
 │   └── STAGE_PLAN.md
-│   └── TEST_LOG.md
+│   └── TEST_LOGS.md
 ├── data/
 │   ├── words-4.json
 │   ├── words-5.json
