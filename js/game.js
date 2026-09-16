@@ -1,39 +1,51 @@
+```javascript
 /*
-Wordle-style game
-Stage 17: Dictionary validation and target-word data
+  Wordle-style game
+  Stage 17: Curated target-word selection
 
-This file controls:
+  This file controls:
+  - Fixed and random word-length selection.
+  - Random target selection.
+  - Separate guess and target word collections.
+  - Dictionary loading from JSON files.
+  - Dynamic board creation.
+  - Physical keyboard input.
+  - On-screen keyboard input.
+  - Backspace.
+  - Guess validation.
+  - Wordle-style letter evaluation.
+  - Accessible descriptions for evaluated tiles.
+  - Win/loss detection.
+  - New-game/reset behaviour.
 
-* Fixed and random word-length selection.
-* Random target selection.
-* Loading word and target JSON data.
-* Dictionary and target-data validation.
-* Dynamic board creation.
-* Physical keyboard input.
-* On-screen keyboard input.
-* Backspace.
-* Guess validation.
-* Wordle-style letter evaluation.
-* Accessible descriptions for evaluated tiles.
-* Win/loss detection.
-* New-game/reset behaviour.
+  Supported lengths:
+  4, 5, 6 and 7 letters.
 
-Supported lengths:
-4, 5, 6 and 7 letters.
+  Stage 17 uses two sets of JSON files:
 
-Stage 17 data model:
+  Guess dictionaries:
+    data/words-4.json
+    data/words-5.json
+    data/words-6.json
+    data/words-7.json
 
-* words-X.json contains acceptable guesses.
-* targets-X.json contains possible target words.
+  Curated target dictionaries:
+    data/targets-4.json
+    data/targets-5.json
+    data/targets-6.json
+    data/targets-7.json
 
-A target must also exist in the corresponding guess dictionary.
+  Guess dictionaries determine which guesses are accepted.
+
+  Target dictionaries determine which words can actually
+  be selected as the answer.
 */
 
 "use strict";
 
 /* ------------------------------
-Game constants
------------------------------- */
+   Game constants
+   ------------------------------ */
 
 const SUPPORTED_WORD_LENGTHS = [4, 5, 6, 7];
 const DEFAULT_WORD_LENGTH = 5;
@@ -41,50 +53,75 @@ const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
 /*
-JSON data files.
+  Capture the actual URL of this game.js file while the
+  script is executing.
 
-Relative paths are used so the application continues to work
-correctly when hosted from the repository's GitHub Pages path.
+  This is deliberately done here rather than trying to
+  reconstruct the script location later.
+
+  On GitHub Pages, if game.js is:
+
+    /consolidation_project/js/game.js
+
+  then:
+
+    ../data/words-5.json
+
+  correctly resolves to:
+
+    /consolidation_project/data/words-5.json
 */
-const DATA_DIRECTORY = "data";
-
-const wordFilePaths = {
-4: `${DATA_DIRECTORY}/words-4.json`,
-5: `${DATA_DIRECTORY}/words-5.json`,
-6: `${DATA_DIRECTORY}/words-6.json`,
-7: `${DATA_DIRECTORY}/words-7.json`
-};
-
-const targetFilePaths = {
-4: `${DATA_DIRECTORY}/targets-4.json`,
-5: `${DATA_DIRECTORY}/targets-5.json`,
-6: `${DATA_DIRECTORY}/targets-6.json`,
-7: `${DATA_DIRECTORY}/targets-7.json`
-};
+const GAME_SCRIPT_URL =
+  document.currentScript
+    ? document.currentScript.src
+    : new URL(
+        "js/game.js",
+        document.baseURI
+      ).href;
 
 /*
-Stage 17 target-pool requirements.
+  Dictionary filenames.
+
+  These paths are resolved relative to the actual
+  game.js file URL above.
 */
-const TARGET_COUNTS = {
-4: 300,
-5: 1000,
-6: 750,
-7: 600
+const WORD_DATA_FILES = {
+  4: "../data/words-4.json",
+  5: "../data/words-5.json",
+  6: "../data/words-6.json",
+  7: "../data/words-7.json"
+};
+
+const TARGET_DATA_FILES = {
+  4: "../data/targets-4.json",
+  5: "../data/targets-5.json",
+  6: "../data/targets-6.json",
+  7: "../data/targets-7.json"
 };
 
 /* ------------------------------
-Page elements and game state
------------------------------- */
+   Page elements
+   ------------------------------ */
 
-const board = document.querySelector(".board");
+const board =
+  document.querySelector(".board");
+
 const statusMessage =
-document.querySelector(".stage-status");
-const newGameButton =
-document.querySelector("#new-game");
-const wordLengthSelect =
-document.querySelector("#word-length");
+  document.querySelector(".stage-status");
 
-let WORD_LENGTH = DEFAULT_WORD_LENGTH;
+const newGameButton =
+  document.querySelector("#new-game");
+
+const wordLengthSelect =
+  document.querySelector("#word-length");
+
+/* ------------------------------
+   Game state
+   ------------------------------ */
+
+let WORD_LENGTH =
+  DEFAULT_WORD_LENGTH;
+
 let targetWord = "";
 
 let rows = [];
@@ -92,874 +129,1265 @@ let currentRow = 0;
 let currentTile = 0;
 let gameOver = false;
 
-let wordCollections = {};
-let targetCollections = {};
+/*
+  Guess dictionaries.
+
+  These contain all words that the player is allowed
+  to submit as guesses.
+*/
+const wordCollections = {
+  4: new Set(),
+  5: new Set(),
+  6: new Set(),
+  7: new Set()
+};
+
+/*
+  Target dictionaries.
+
+  These contain only the curated words that may be
+  selected as answers.
+*/
+const targetCollections = {
+  4: new Set(),
+  5: new Set(),
+  6: new Set(),
+  7: new Set()
+};
 
 let dictionariesLoaded = false;
-let dataLoadError = false;
 
 /* ------------------------------
-Data validation helpers
------------------------------- */
+   Status helpers
+   ------------------------------ */
 
-/*
-Convert loaded JSON data into a Set after validating its
-basic structure.
-
-The expected JSON format is:
-
-[
-"WORD",
-"WORD",
-"WORD"
-]
-*/
-function validateWordCollection(
-data,
-expectedLength,
-collectionName
-) {
-if (!Array.isArray(data)) {
-throw new Error(
-`${collectionName} must contain a JSON array.`
-);
-}
-
-const words = data.map((word) => {
-if (typeof word !== "string") {
-throw new Error(
-`${collectionName} contains a non-string entry.`
-);
-}
-
-```
-return word.trim().toUpperCase();
-```
-
-});
-
-for (const word of words) {
-if (word.length !== expectedLength) {
-throw new Error(
-`${collectionName} contains "${word}" with the wrong length.`
-);
-}
-
-```
-if (!/^[A-Z]+$/.test(word)) {
-  throw new Error(
-    `${collectionName} contains invalid word "${word}".`
-  );
-}
-```
-
-}
-
-const uniqueWords = new Set(words);
-
-if (uniqueWords.size !== words.length) {
-throw new Error(
-`${collectionName} contains duplicate words.`
-);
-}
-
-return uniqueWords;
-}
-
-/*
-Validate a target collection against the corresponding
-guess dictionary.
-
-Every possible answer must be a valid guess.
-*/
-function validateTargetCollection(
-targets,
-words,
-expectedLength,
-collectionName
-) {
-if (targets.size !== TARGET_COUNTS[expectedLength]) {
-throw new Error(
-`${collectionName} contains ${targets.size} words; ` +
-`expected ${TARGET_COUNTS[expectedLength]}.`
-);
-}
-
-for (const target of targets) {
-if (!words.has(target)) {
-throw new Error(
-`${collectionName} contains "${target}" ` +
-"which is missing from its guess dictionary."
-);
-}
-}
+function showMessage(message) {
+  if (statusMessage) {
+    statusMessage.textContent =
+      message;
+  }
 }
 
 /* ------------------------------
-Data loading
------------------------------- */
+   Randomness
+   ------------------------------ */
 
-async function loadJsonFile(path) {
-const response = await fetch(path, {
-cache: "no-store"
-});
+/*
+  Return a cryptographically stronger random integer.
 
-if (!response.ok) {
-throw new Error(
-`Unable to load ${path}: HTTP ${response.status}.`
-);
+  crypto.getRandomValues() is preferable to Math.random()
+  for selecting the initial target because separate users
+  loading the page at roughly the same time should not
+  receive the same deterministic-looking sequence.
+
+  Math.random() remains as a compatibility fallback.
+*/
+function getSecureRandomIndex(length) {
+  if (length <= 0) {
+    return -1;
+  }
+
+  if (
+    window.crypto &&
+    typeof window.crypto.getRandomValues ===
+      "function"
+  ) {
+    const randomValues =
+      new Uint32Array(1);
+
+    window.crypto.getRandomValues(
+      randomValues
+    );
+
+    /*
+      Rejection sampling avoids introducing a small
+      modulo bias when the collection size does not
+      divide evenly into the uint32 range.
+    */
+    const maximum =
+      Math.floor(
+        0x100000000 / length
+      ) * length;
+
+    let randomValue =
+      randomValues[0];
+
+    while (randomValue >= maximum) {
+      window.crypto.getRandomValues(
+        randomValues
+      );
+
+      randomValue =
+        randomValues[0];
+    }
+
+    return randomValue % length;
+  }
+
+  return Math.floor(
+    Math.random() * length
+  );
 }
 
-return response.json();
+/* ------------------------------
+   Dictionary URL helpers
+   ------------------------------ */
+
+/*
+  Build a JSON URL relative to the actual game.js file.
+
+  This is the important Stage 16/17 loading fix.
+
+  It does not depend on:
+  - the current page URL
+  - the GitHub Pages repository name
+  - a hard-coded domain
+  - the browser's current directory
+*/
+function getDataFileUrl(relativePath) {
+  if (!GAME_SCRIPT_URL) {
+    throw new Error(
+      "Could not determine the location of game.js."
+    );
+  }
+
+  return new URL(
+    relativePath,
+    GAME_SCRIPT_URL
+  );
 }
 
-async function loadGameData() {
-const loadedWords = {};
-const loadedTargets = {};
+/* ------------------------------
+   Dictionary loading
+   ------------------------------ */
 
-for (const length of SUPPORTED_WORD_LENGTHS) {
-const wordsData =
-await loadJsonFile(wordFilePaths[length]);
+/*
+  Load and validate one JSON word collection.
 
-```
-const targetsData =
-  await loadJsonFile(targetFilePaths[length]);
-
-const words =
-  validateWordCollection(
-    wordsData,
-    length,
-    `words-${length}.json`
-  );
-
-const targets =
-  validateWordCollection(
-    targetsData,
-    length,
-    `targets-${length}.json`
-  );
-
-validateTargetCollection(
-  targets,
-  words,
+  The same loader is used for both:
+  - the full guess dictionary
+  - the curated target dictionary
+*/
+async function loadWordCollection(
   length,
-  `targets-${length}.json`
-);
+  relativePath,
+  collectionType
+) {
+  if (!relativePath) {
+    throw new Error(
+      `No ${collectionType} file configured for ${length}-letter words.`
+    );
+  }
 
-loadedWords[length] = words;
-loadedTargets[length] = targets;
-```
+  let fileUrl;
 
+  try {
+    fileUrl =
+      getDataFileUrl(relativePath);
+  } catch (error) {
+    throw new Error(
+      `Could not determine the URL for the ${collectionType} dictionary.`
+    );
+  }
+
+  let response;
+
+  try {
+    response = await fetch(
+      fileUrl.href,
+      {
+        cache: "no-store"
+      }
+    );
+  } catch (error) {
+    throw new Error(
+      `Network error while loading ${fileUrl.pathname}.`
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Could not load ${fileUrl.pathname} — HTTP ${response.status}.`
+    );
+  }
+
+  let data;
+
+  try {
+    data = await response.json();
+  } catch (error) {
+    throw new Error(
+      `The file ${fileUrl.pathname} is not valid JSON.`
+    );
+  }
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      `${fileUrl.pathname} must contain a JSON array of words.`
+    );
+  }
+
+  const words =
+    new Set();
+
+  data.forEach((word) => {
+    if (
+      typeof word !== "string"
+    ) {
+      return;
+    }
+
+    const normalisedWord =
+      word
+        .trim()
+        .toUpperCase();
+
+    if (
+      normalisedWord.length ===
+        length &&
+      /^[A-Z]+$/.test(
+        normalisedWord
+      )
+    ) {
+      words.add(
+        normalisedWord
+      );
+    }
+  });
+
+  if (words.size === 0) {
+    throw new Error(
+      `${fileUrl.pathname} loaded successfully but contained no valid ${length}-letter words.`
+    );
+  }
+
+  return words;
 }
 
-wordCollections = loadedWords;
-targetCollections = loadedTargets;
+/*
+  Load all guess dictionaries and all target dictionaries.
 
-dictionariesLoaded = true;
+  Each file is loaded separately so that any failure
+  identifies the exact file involved.
+*/
+async function loadDictionaries() {
+  showMessage(
+    "Stage 17: Loading dictionaries…"
+  );
+
+  /*
+    Load the general guess dictionaries.
+  */
+  for (
+    const length of
+      SUPPORTED_WORD_LENGTHS
+  ) {
+    try {
+      const words =
+        await loadWordCollection(
+          length,
+          WORD_DATA_FILES[length],
+          "guess"
+        );
+
+      wordCollections[length] =
+        words;
+
+      console.log(
+        `Loaded ${words.size} valid guess words for ${length}-letter games.`
+      );
+    } catch (error) {
+      console.error(
+        `Guess dictionary loading failed for ${length}-letter words:`,
+        error
+      );
+
+      showMessage(
+        `Dictionary error: ${error.message}`
+      );
+
+      dictionariesLoaded =
+        false;
+
+      return false;
+    }
+  }
+
+  /*
+    Load the curated target dictionaries.
+  */
+  for (
+    const length of
+      SUPPORTED_WORD_LENGTHS
+  ) {
+    try {
+      const targets =
+        await loadWordCollection(
+          length,
+          TARGET_DATA_FILES[length],
+          "target"
+        );
+
+      targetCollections[length] =
+        targets;
+
+      console.log(
+        `Loaded ${targets.size} curated target words for ${length}-letter games.`
+      );
+    } catch (error) {
+      console.error(
+        `Target dictionary loading failed for ${length}-letter words:`,
+        error
+      );
+
+      showMessage(
+        `Target dictionary error: ${error.message}`
+      );
+
+      dictionariesLoaded =
+        false;
+
+      return false;
+    }
+  }
+
+  /*
+    Final safety check:
+    every target must also be an accepted guess.
+
+    This prevents a target file from accidentally
+    containing a word that the player could never
+    submit successfully.
+  */
+  for (
+    const length of
+      SUPPORTED_WORD_LENGTHS
+  ) {
+    const guesses =
+      wordCollections[length];
+
+    const targets =
+      targetCollections[length];
+
+    const invalidTargets =
+      Array.from(
+        targets
+      ).filter(
+        (target) =>
+          !guesses.has(target)
+      );
+
+    if (
+      invalidTargets.length > 0
+    ) {
+      console.error(
+        `Target validation failed for ${length}-letter words:`,
+        invalidTargets
+      );
+
+      showMessage(
+        `Target dictionary error: ${invalidTargets.length} target word(s) are missing from the guess dictionary.`
+      );
+
+      dictionariesLoaded =
+        false;
+
+      return false;
+    }
+  }
+
+  dictionariesLoaded =
+    true;
+
+  console.log(
+    "All Stage 17 guess and target dictionaries loaded successfully."
+  );
+
+  return true;
 }
 
 /* ------------------------------
-Word-length helpers
------------------------------- */
+   Word-length helpers
+   ------------------------------ */
 
-function isSupportedWordLength(length) {
-return SUPPORTED_WORD_LENGTHS.includes(length);
+function isSupportedWordLength(
+  length
+) {
+  return SUPPORTED_WORD_LENGTHS.includes(
+    length
+  );
 }
 
 function getWordLengthWords() {
-return wordCollections[WORD_LENGTH] || new Set();
+  return (
+    wordCollections[
+      WORD_LENGTH
+    ] ||
+    new Set()
+  );
 }
 
-function getWordLengthTargets() {
-return targetCollections[WORD_LENGTH] || new Set();
+function getTargetWords() {
+  return (
+    targetCollections[
+      WORD_LENGTH
+    ] ||
+    new Set()
+  );
 }
 
 function getRandomWordLength() {
-const randomIndex = Math.floor(
-Math.random() * SUPPORTED_WORD_LENGTHS.length
-);
+  const randomIndex =
+    getSecureRandomIndex(
+      SUPPORTED_WORD_LENGTHS.length
+    );
 
-return SUPPORTED_WORD_LENGTHS[randomIndex];
+  return SUPPORTED_WORD_LENGTHS[
+    randomIndex
+  ];
 }
 
 function isRandomWordLengthSelected() {
-return (
-wordLengthSelect &&
-wordLengthSelect.value === RANDOM_WORD_LENGTH
-);
+  return (
+    wordLengthSelect &&
+    wordLengthSelect.value ===
+      RANDOM_WORD_LENGTH
+  );
 }
 
 /* ------------------------------
-Target-word helpers
------------------------------- */
+   Target-word helpers
+   ------------------------------ */
 
 function getRandomTargetWord() {
-const targets =
-Array.from(getWordLengthTargets());
+  const words =
+    Array.from(
+      getTargetWords()
+    );
 
-if (targets.length === 0) {
-throw new Error(
-`No target words are available for ${WORD_LENGTH} letters.`
-);
-}
+  if (
+    words.length === 0
+  ) {
+    return "";
+  }
 
-const randomIndex = Math.floor(
-Math.random() * targets.length
-);
+  const randomIndex =
+    getSecureRandomIndex(
+      words.length
+    );
 
-return targets[randomIndex];
+  if (
+    randomIndex < 0
+  ) {
+    return "";
+  }
+
+  return words[
+    randomIndex
+  ];
 }
 
 function selectRandomTarget() {
-targetWord = getRandomTargetWord();
+  targetWord =
+    getRandomTargetWord();
+
+  if (!targetWord) {
+    throw new Error(
+      `No target words are available for ${WORD_LENGTH}-letter games.`
+    );
+  }
+
+  console.log(
+    `Selected ${WORD_LENGTH}-letter target: ${targetWord}`
+  );
 }
 
 /* ------------------------------
-Instructions and messages
------------------------------- */
+   Instructions
+   ------------------------------ */
 
 function updateInstructions() {
-const instructions =
-document.querySelector(".instructions");
+  const instructions =
+    document.querySelector(
+      ".instructions"
+    );
 
-if (!instructions) {
-return;
-}
+  if (!instructions) {
+    return;
+  }
 
-instructions.textContent =
-`Guess the ${WORD_LENGTH}-letter word in six tries.`;
-}
-
-function showMessage(message) {
-if (statusMessage) {
-statusMessage.textContent = message;
-}
+  instructions.textContent =
+    `Guess the ${WORD_LENGTH}-letter word in six tries.`;
 }
 
 /* ------------------------------
-Board creation
------------------------------- */
+   Board creation
+   ------------------------------ */
 
 function createBoard() {
-if (!board) {
-return;
-}
+  if (!board) {
+    return;
+  }
 
-board.innerHTML = "";
+  board.innerHTML = "";
 
-for (
-let rowIndex = 0;
-rowIndex < MAX_GUESSES;
-rowIndex += 1
-) {
-const row = document.createElement("div");
+  for (
+    let rowIndex = 0;
+    rowIndex < MAX_GUESSES;
+    rowIndex += 1
+  ) {
+    const row =
+      document.createElement(
+        "div"
+      );
 
-```
-row.className = "row";
+    row.className =
+      "row";
 
-row.setAttribute(
-  "aria-label",
-  `Guess ${rowIndex + 1}`
-);
+    row.setAttribute(
+      "aria-label",
+      `Guess ${rowIndex + 1}`
+    );
 
-row.style.setProperty(
-  "--word-length",
-  WORD_LENGTH
-);
+    row.style.setProperty(
+      "--word-length",
+      WORD_LENGTH
+    );
 
-for (
-  let tileIndex = 0;
-  tileIndex < WORD_LENGTH;
-  tileIndex += 1
-) {
-  const tile =
-    document.createElement("div");
+    for (
+      let tileIndex = 0;
+      tileIndex < WORD_LENGTH;
+      tileIndex += 1
+    ) {
+      const tile =
+        document.createElement(
+          "div"
+        );
 
-  tile.className = "tile";
+      tile.className =
+        "tile";
 
-  tile.setAttribute(
-    "aria-label",
-    `Guess ${rowIndex + 1}, position ${tileIndex + 1}: empty`
-  );
+      tile.setAttribute(
+        "aria-label",
+        `Guess ${rowIndex + 1}, position ${tileIndex + 1}: empty`
+      );
 
-  row.appendChild(tile);
-}
+      row.appendChild(
+        tile
+      );
+    }
 
-board.appendChild(row);
-```
+    board.appendChild(
+      row
+    );
+  }
 
-}
-
-rows = Array.from(
-board.querySelectorAll(".row")
-);
+  rows =
+    Array.from(
+      board.querySelectorAll(
+        ".row"
+      )
+    );
 }
 
 /* ------------------------------
-Game initialisation
------------------------------- */
+   Game initialisation
+   ------------------------------ */
 
 function initialiseGame() {
-if (!dictionariesLoaded) {
-return;
-}
+  if (!dictionariesLoaded) {
+    showMessage(
+      "Dictionaries have not finished loading."
+    );
 
-/*
-Random mode selects a supported length for every new game.
-*/
-if (isRandomWordLengthSelected()) {
-WORD_LENGTH = getRandomWordLength();
-} else {
-const selectedLength =
-Number(wordLengthSelect.value);
+    return;
+  }
 
-```
-if (isSupportedWordLength(selectedLength)) {
-  WORD_LENGTH = selectedLength;
-} else {
-  WORD_LENGTH = DEFAULT_WORD_LENGTH;
+  /*
+    Determine the word length for
+    this game.
+  */
+  if (
+    isRandomWordLengthSelected()
+  ) {
+    WORD_LENGTH =
+      getRandomWordLength();
+  } else {
+    const selectedLength =
+      Number(
+        wordLengthSelect
+          ? wordLengthSelect.value
+          : DEFAULT_WORD_LENGTH
+      );
 
-  if (wordLengthSelect) {
-    wordLengthSelect.value =
-      String(DEFAULT_WORD_LENGTH);
+    if (
+      isSupportedWordLength(
+        selectedLength
+      )
+    ) {
+      WORD_LENGTH =
+        selectedLength;
+    } else {
+      WORD_LENGTH =
+        DEFAULT_WORD_LENGTH;
+
+      if (
+        wordLengthSelect
+      ) {
+        wordLengthSelect.value =
+          String(
+            DEFAULT_WORD_LENGTH
+          );
+      }
+    }
+  }
+
+  /*
+    Stage 17:
+    Select the target only from the
+    curated target collection.
+  */
+  selectRandomTarget();
+
+  /*
+    Create the board only after the
+    dictionaries and target are ready.
+  */
+  createBoard();
+
+  updateInstructions();
+
+  currentRow = 0;
+  currentTile = 0;
+  gameOver = false;
+
+  if (
+    isRandomWordLengthSelected()
+  ) {
+    showMessage(
+      `Stage 17: Random ${WORD_LENGTH}-letter game`
+    );
+  } else {
+    showMessage(
+      `Stage 17: ${WORD_LENGTH}-letter game`
+    );
+  }
+
+  if (newGameButton) {
+    newGameButton.hidden =
+      true;
   }
 }
-```
-
-}
-
-/*
-Select a target only from the curated target collection
-for the selected length.
-*/
-selectRandomTarget();
-
-createBoard();
-updateInstructions();
-
-currentRow = 0;
-currentTile = 0;
-gameOver = false;
-
-if (isRandomWordLengthSelected()) {
-showMessage(
-`Stage 17: Random ${WORD_LENGTH}-letter game`
-);
-} else {
-showMessage(
-`Stage 17: ${WORD_LENGTH}-letter game`
-);
-}
-
-if (newGameButton) {
-newGameButton.hidden = true;
-}
-}
 
 /* ------------------------------
-Data-loading initialisation
------------------------------- */
-
-async function startApplication() {
-try {
-showMessage("Loading word data…");
-
-```
-await loadGameData();
-
-startInitialGame();
-```
-
-} catch (error) {
-dataLoadError = true;
-
-```
-console.error(
-  "Stage 17 data-loading error:",
-  error
-);
-
-showMessage(
-  "Unable to load the game's word data."
-);
-
-if (board) {
-  board.innerHTML = "";
-}
-
-if (newGameButton) {
-  newGameButton.hidden = true;
-}
-```
-
-}
-}
-
-function startInitialGame() {
-initialiseGame();
-}
-
-/* ------------------------------
-Board helpers
------------------------------- */
+   Board helpers
+   ------------------------------ */
 
 function getCurrentRowTiles() {
-if (!rows[currentRow]) {
-return [];
-}
+  if (
+    !rows[currentRow]
+  ) {
+    return [];
+  }
 
-return Array.from(
-rows[currentRow].querySelectorAll(".tile")
-).slice(0, WORD_LENGTH);
+  return Array.from(
+    rows[currentRow]
+      .querySelectorAll(
+        ".tile"
+      )
+  ).slice(
+    0,
+    WORD_LENGTH
+  );
 }
 
 function getCurrentGuess() {
-const tiles = getCurrentRowTiles();
+  const tiles =
+    getCurrentRowTiles();
 
-return tiles
-.slice(0, currentTile)
-.map((tile) =>
-tile.textContent.trim().toUpperCase()
-)
-.join("");
+  return tiles
+    .slice(
+      0,
+      currentTile
+    )
+    .map(
+      (tile) =>
+        tile.textContent
+          .trim()
+          .toUpperCase()
+    )
+    .join("");
 }
 
 function updateTileInputLabel(
-tile,
-letter,
-rowIndex,
-tileIndex
+  tile,
+  letter,
+  rowIndex,
+  tileIndex
 ) {
-if (!tile) {
-return;
-}
+  if (!tile) {
+    return;
+  }
 
-tile.setAttribute(
-"aria-label",
-`Guess ${rowIndex + 1}, position ${tileIndex + 1}: ${letter}`
-);
+  tile.setAttribute(
+    "aria-label",
+    `Guess ${rowIndex + 1}, position ${tileIndex + 1}: ${letter}`
+  );
 }
 
 /* ------------------------------
-Letter input
------------------------------- */
+   Letter input
+   ------------------------------ */
 
 function addLetter(letter) {
-if (
-dataLoadError ||
-!dictionariesLoaded ||
-gameOver ||
-currentTile >= WORD_LENGTH
-) {
-return;
-}
+  if (
+    gameOver ||
+    currentTile >=
+      WORD_LENGTH
+  ) {
+    return;
+  }
 
-const tiles = getCurrentRowTiles();
+  const tiles =
+    getCurrentRowTiles();
 
-if (!tiles[currentTile]) {
-return;
-}
+  if (
+    !tiles[currentTile]
+  ) {
+    return;
+  }
 
-const upperLetter =
-letter.toUpperCase();
+  const upperLetter =
+    letter.toUpperCase();
 
-tiles[currentTile].textContent =
-upperLetter;
+  tiles[currentTile]
+    .textContent =
+    upperLetter;
 
-updateTileInputLabel(
-tiles[currentTile],
-upperLetter,
-currentRow,
-currentTile
-);
+  updateTileInputLabel(
+    tiles[currentTile],
+    upperLetter,
+    currentRow,
+    currentTile
+  );
 
-currentTile += 1;
+  currentTile += 1;
 }
 
 function removeLetter() {
-if (
-dataLoadError ||
-!dictionariesLoaded ||
-gameOver ||
-currentTile <= 0
+  if (
+    gameOver ||
+    currentTile <= 0
+  ) {
+    return;
+  }
+
+  currentTile -= 1;
+
+  const tiles =
+    getCurrentRowTiles();
+
+  if (
+    tiles[currentTile]
+  ) {
+    tiles[currentTile]
+      .textContent = "";
+
+    tiles[currentTile]
+      .removeAttribute(
+        "aria-label"
+      );
+  }
+}
+
+function handleLetter(
+  letter
 ) {
-return;
-}
-
-currentTile -= 1;
-
-const tiles = getCurrentRowTiles();
-
-if (tiles[currentTile]) {
-tiles[currentTile].textContent = "";
-
-```
-tiles[currentTile]
-  .setAttribute(
-    "aria-label",
-    `Guess ${currentRow + 1}, position ${currentTile + 1}: empty`
-  );
-```
-
-}
-}
-
-function handleLetter(letter) {
-if (/^[a-zA-Z]$/.test(letter)) {
-addLetter(letter);
-}
+  if (
+    /^[a-zA-Z]$/.test(
+      letter
+    )
+  ) {
+    addLetter(letter);
+  }
 }
 
 /* ------------------------------
-Guess evaluation
------------------------------- */
+   Guess evaluation
+   ------------------------------ */
 
-function evaluateGuess(guess) {
-const results =
-Array(WORD_LENGTH).fill("absent");
-
-const remainingTargetLetters =
-targetWord.split("");
-
-/*
-First pass:
-exact matches are marked correct and consumed.
-*/
-for (
-let index = 0;
-index < WORD_LENGTH;
-index += 1
+function evaluateGuess(
+  guess
 ) {
-if (
-guess[index] === targetWord[index]
+  const results =
+    Array(
+      WORD_LENGTH
+    ).fill(
+      "absent"
+    );
+
+  const remainingTargetLetters =
+    targetWord.split("");
+
+  /*
+    First pass:
+    exact matches.
+  */
+  for (
+    let index = 0;
+    index < WORD_LENGTH;
+    index += 1
+  ) {
+    if (
+      guess[index] ===
+      targetWord[index]
+    ) {
+      results[index] =
+        "correct";
+
+      remainingTargetLetters[
+        index
+      ] = null;
+    }
+  }
+
+  /*
+    Second pass:
+    present but incorrectly positioned.
+  */
+  for (
+    let index = 0;
+    index < WORD_LENGTH;
+    index += 1
+  ) {
+    if (
+      results[index] ===
+      "correct"
+    ) {
+      continue;
+    }
+
+    const matchingIndex =
+      remainingTargetLetters.indexOf(
+        guess[index]
+      );
+
+    if (
+      matchingIndex !== -1
+    ) {
+      results[index] =
+        "present";
+
+      remainingTargetLetters[
+        matchingIndex
+      ] = null;
+    }
+  }
+
+  return results;
+}
+
+function getResultDescription(
+  result
 ) {
-results[index] = "correct";
+  if (
+    result === "correct"
+  ) {
+    return "correct position";
+  }
 
-```
-  remainingTargetLetters[index] =
-    null;
-}
-```
+  if (
+    result === "present"
+  ) {
+    return "correct letter, wrong position";
+  }
 
-}
-
-/*
-Second pass:
-remaining letters are checked for
-wrong-position matches.
-*/
-for (
-let index = 0;
-index < WORD_LENGTH;
-index += 1
-) {
-if (results[index] === "correct") {
-continue;
-}
-
-```
-const matchingIndex =
-  remainingTargetLetters.indexOf(
-    guess[index]
-  );
-
-if (matchingIndex !== -1) {
-  results[index] = "present";
-
-  remainingTargetLetters[matchingIndex] =
-    null;
-}
-```
-
-}
-
-return results;
-}
-
-function getResultDescription(result) {
-if (result === "correct") {
-return "correct position";
-}
-
-if (result === "present") {
-return "correct letter, wrong position";
-}
-
-return "letter not present";
+  return "letter not present";
 }
 
 function displayEvaluation(
-results,
-rowIndex
+  results,
+  rowIndex
 ) {
-if (!rows[rowIndex]) {
-return;
-}
+  if (
+    !rows[rowIndex]
+  ) {
+    return;
+  }
 
-const tiles = Array.from(
-rows[rowIndex].querySelectorAll(".tile")
-).slice(0, WORD_LENGTH);
+  const tiles =
+    Array.from(
+      rows[rowIndex]
+        .querySelectorAll(
+          ".tile"
+        )
+    ).slice(
+      0,
+      WORD_LENGTH
+    );
 
-results.forEach((result, index) => {
-if (!tiles[index]) {
-return;
-}
+  results.forEach(
+    (result, index) => {
+      if (
+        !tiles[index]
+      ) {
+        return;
+      }
 
-```
-const letter =
-  tiles[index].textContent.trim();
+      const letter =
+        tiles[index]
+          .textContent
+          .trim();
 
-tiles[index].classList.add(result);
+      tiles[index]
+        .classList
+        .add(result);
 
-tiles[index].setAttribute(
-  "aria-label",
-  `Guess ${rowIndex + 1}, position ${index + 1}: ${letter}, ${getResultDescription(result)}`
-);
-```
-
-});
-}
-
-/* ------------------------------
-Win/loss handling
------------------------------- */
-
-function endGame(won) {
-gameOver = true;
-
-if (won) {
-showMessage("You win!");
-} else {
-showMessage(
-`Game over — the word was ${targetWord}.`
-);
-}
-
-if (newGameButton) {
-newGameButton.hidden = false;
-}
+      tiles[index]
+        .setAttribute(
+          "aria-label",
+          `Guess ${rowIndex + 1}, position ${index + 1}: ${letter}, ${getResultDescription(result)}`
+        );
+    }
+  );
 }
 
 /* ------------------------------
-Guess submission
------------------------------- */
+   Win/loss handling
+   ------------------------------ */
+
+function endGame(
+  won
+) {
+  gameOver = true;
+
+  if (won) {
+    showMessage(
+      "You win!"
+    );
+  } else {
+    showMessage(
+      `Game over — the word was ${targetWord}.`
+    );
+  }
+
+  if (
+    newGameButton
+  ) {
+    newGameButton.hidden =
+      false;
+  }
+}
+
+/* ------------------------------
+   Guess submission
+   ------------------------------ */
 
 function submitGuess() {
-if (
-dataLoadError ||
-!dictionariesLoaded ||
-gameOver
-) {
-return;
-}
+  if (gameOver) {
+    return;
+  }
 
-if (currentTile !== WORD_LENGTH) {
-showMessage("Not enough letters");
-return;
-}
+  if (
+    currentTile !==
+    WORD_LENGTH
+  ) {
+    showMessage(
+      "Not enough letters"
+    );
 
-const guess = getCurrentGuess();
+    return;
+  }
 
-if (guess.length !== WORD_LENGTH) {
-showMessage("Not enough letters");
-return;
-}
+  const guess =
+    getCurrentGuess();
 
-if (!getWordLengthWords().has(guess)) {
-showMessage("Word not in list");
-return;
-}
+  if (
+    guess.length !==
+    WORD_LENGTH
+  ) {
+    showMessage(
+      "Not enough letters"
+    );
 
-const results =
-evaluateGuess(guess);
+    return;
+  }
 
-displayEvaluation(
-results,
-currentRow
-);
+  /*
+    Guesses are checked against the
+    comprehensive guess dictionary,
+    not the smaller target collection.
+  */
+  if (
+    !getWordLengthWords()
+      .has(guess)
+  ) {
+    showMessage(
+      "Word not in list"
+    );
 
-if (guess === targetWord) {
-endGame(true);
-return;
-}
+    return;
+  }
 
-if (
-currentRow === MAX_GUESSES - 1
-) {
-endGame(false);
-return;
-}
+  const results =
+    evaluateGuess(
+      guess
+    );
 
-showMessage("Guess evaluated");
+  displayEvaluation(
+    results,
+    currentRow
+  );
 
-currentRow += 1;
-currentTile = 0;
+  if (
+    guess === targetWord
+  ) {
+    endGame(true);
+    return;
+  }
+
+  if (
+    currentRow ===
+    MAX_GUESSES - 1
+  ) {
+    endGame(false);
+    return;
+  }
+
+  showMessage(
+    "Guess evaluated"
+  );
+
+  currentRow += 1;
+  currentTile = 0;
 }
 
 /* ------------------------------
-New game
------------------------------- */
+   New game
+   ------------------------------ */
 
 function startNewGame() {
-if (
-dataLoadError ||
-!dictionariesLoaded
-) {
-return;
-}
-
-initialiseGame();
+  initialiseGame();
 }
 
 /* ------------------------------
-Word-length selection
------------------------------- */
+   Word-length selection
+   ------------------------------ */
 
 function handleWordLengthChange() {
+  if (
+    !wordLengthSelect
+  ) {
+    return;
+  }
+
+  const selectedValue =
+    wordLengthSelect.value;
+
+  if (
+    selectedValue ===
+    RANDOM_WORD_LENGTH
+  ) {
+    initialiseGame();
+    return;
+  }
+
+  const selectedLength =
+    Number(
+      selectedValue
+    );
+
+  if (
+    !isSupportedWordLength(
+      selectedLength
+    )
+  ) {
+    wordLengthSelect.value =
+      String(
+        DEFAULT_WORD_LENGTH
+      );
+
+    WORD_LENGTH =
+      DEFAULT_WORD_LENGTH;
+  } else {
+    WORD_LENGTH =
+      selectedLength;
+  }
+
+  initialiseGame();
+}
+
 if (
-!wordLengthSelect ||
-dataLoadError ||
-!dictionariesLoaded
+  wordLengthSelect
 ) {
-return;
+  wordLengthSelect.addEventListener(
+    "change",
+    handleWordLengthChange
+  );
 }
 
-const selectedValue =
-wordLengthSelect.value;
+/* ------------------------------
+   Shared actions
+   ------------------------------ */
+
+function handleAction(
+  action
+) {
+  if (
+    action ===
+    "backspace"
+  ) {
+    removeLetter();
+    return;
+  }
+
+  if (
+    action ===
+    "enter"
+  ) {
+    submitGuess();
+  }
+}
+
+/* ------------------------------
+   Physical keyboard
+   ------------------------------ */
+
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    if (
+      event.key ===
+      "Backspace"
+    ) {
+      event.preventDefault();
+
+      handleAction(
+        "backspace"
+      );
+
+      return;
+    }
+
+    if (
+      event.key ===
+      "Enter"
+    ) {
+      event.preventDefault();
+
+      handleAction(
+        "enter"
+      );
+
+      return;
+    }
+
+    if (
+      /^[a-zA-Z]$/.test(
+        event.key
+      )
+    ) {
+      event.preventDefault();
+
+      handleLetter(
+        event.key
+      );
+    }
+  }
+);
+
+/* ------------------------------
+   On-screen keyboard
+   ------------------------------ */
+
+document.addEventListener(
+  "click",
+  (event) => {
+    const button =
+      event.target.closest(
+        "button[data-key]"
+      );
+
+    if (!button) {
+      return;
+    }
+
+    const key =
+      button.dataset.key;
+
+    if (
+      key === "enter" ||
+      key === "backspace"
+    ) {
+      handleAction(
+        key
+      );
+
+      return;
+    }
+
+    handleLetter(
+      key
+    );
+  }
+);
+
+/* ------------------------------
+   New Game button
+   ------------------------------ */
 
 if (
-selectedValue === RANDOM_WORD_LENGTH
+  newGameButton
 ) {
-initialiseGame();
-return;
+  newGameButton.addEventListener(
+    "click",
+    startNewGame
+  );
 }
 
-const selectedLength =
-Number(selectedValue);
-
-if (!isSupportedWordLength(selectedLength)) {
-wordLengthSelect.value =
-String(DEFAULT_WORD_LENGTH);
-
-```
-WORD_LENGTH = DEFAULT_WORD_LENGTH;
-```
-
-} else {
-WORD_LENGTH = selectedLength;
-}
+/* ------------------------------
+   Application startup
+   ------------------------------ */
 
 /*
-Changing word length starts a fresh game.
+  Stage 17 starts by loading all
+  eight JSON collections.
+
+  The board is not created until:
+  1. all guess dictionaries load;
+  2. all target dictionaries load;
+  3. every target is also present
+     in its corresponding guess dictionary.
 */
-initialiseGame();
+async function startApplication() {
+  try {
+    const loaded =
+      await loadDictionaries();
+
+    if (!loaded) {
+      return;
+    }
+
+    initialiseGame();
+  } catch (error) {
+    console.error(
+      "Stage 17 application startup failed:",
+      error
+    );
+
+    showMessage(
+      `Startup error: ${error.message}`
+    );
+  }
 }
-
-if (wordLengthSelect) {
-wordLengthSelect.addEventListener(
-"change",
-handleWordLengthChange
-);
-}
-
-/* ------------------------------
-Shared actions
------------------------------- */
-
-function handleAction(action) {
-if (action === "backspace") {
-removeLetter();
-return;
-}
-
-if (action === "enter") {
-submitGuess();
-}
-}
-
-/* ------------------------------
-Physical keyboard
------------------------------- */
-
-document.addEventListener(
-"keydown",
-(event) => {
-if (
-event.ctrlKey ||
-event.metaKey ||
-event.altKey
-) {
-return;
-}
-
-```
-if (event.key === "Backspace") {
-  event.preventDefault();
-  handleAction("backspace");
-  return;
-}
-
-if (event.key === "Enter") {
-  event.preventDefault();
-  handleAction("enter");
-  return;
-}
-
-if (/^[a-zA-Z]$/.test(event.key)) {
-  event.preventDefault();
-  handleLetter(event.key);
-}
-```
-
-}
-);
-
-/* ------------------------------
-On-screen keyboard
------------------------------- */
-
-document.addEventListener(
-"click",
-(event) => {
-const button =
-event.target.closest(
-"button[data-key]"
-);
-
-```
-if (!button) {
-  return;
-}
-
-const key = button.dataset.key;
-
-if (
-  key === "enter" ||
-  key === "backspace"
-) {
-  handleAction(key);
-  return;
-}
-
-handleLetter(key);
-```
-
-}
-);
-
-/* ------------------------------
-New Game button
------------------------------- */
-
-if (newGameButton) {
-newGameButton.addEventListener(
-"click",
-startNewGame
-);
-}
-
-/* ------------------------------
-Start application
------------------------------- */
 
 startApplication();
+```
