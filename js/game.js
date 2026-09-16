@@ -875,6 +875,8 @@ function resetGameState() {
   currentRow = 0;
   currentTile = 0;
   gameOver = false;
+
+  resetKeyboardState();
 }
 
 /* --------------------------------
@@ -1348,13 +1350,18 @@ function submitGuess() {
     return;
   }
 
-  const results =
-    evaluateGuess(guess);
+ const results =
+  evaluateGuess(guess);
 
-  displayEvaluation(
-    results,
-    currentRow
-  );
+displayEvaluation(
+  results,
+  currentRow
+);
+
+updateKeyboardState(
+  guess,
+  results
+);
 
   if (
     guess === targetWord
