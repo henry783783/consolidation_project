@@ -16,6 +16,10 @@
 │   ├── words-5.json
 │   ├── words-6.json
 │   └── words-7.json
+│   ├── targets-4.json
+│   ├── targets-5.json
+│   ├── targets-6.json
+│   └── targets-7.json
 ├── css/
 │   └── style.css
 ├── js/
