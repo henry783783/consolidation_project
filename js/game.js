@@ -45,7 +45,7 @@
     = words that may be entered as guesses.
 
   targets-X.json
-    = words that may be selected as the answer.
+    = words that may be selected as answers.
 */
 
 "use strict";
@@ -66,20 +66,17 @@ const RANDOM_WORD_LENGTH = "random";
 const MAX_GUESSES = 6;
 
 /*
-  IMPORTANT:
   These paths are relative to index.html.
 
-  Do not change these to ../data/... .
+  GitHub Pages:
 
-  GitHub Pages serves the game from:
+  https://henry783783.github.io/consolidation_project/
 
-  /consolidation_project/
-
-  so:
+  therefore:
 
   ./data/words-4.json
 
-  correctly resolves to:
+  resolves to:
 
   /consolidation_project/data/words-4.json
 */
@@ -98,44 +95,22 @@ const TARGET_DATA_FILES = {
 };
 
 /* ------------------------------
-   Page elements
-   ------------------------------ */
-
-const board =
-  document.querySelector(".board");
-
-const statusMessage =
-  document.querySelector(".stage-status");
-
-const newGameButton =
-  document.querySelector("#new-game");
-
-const wordLengthSelect =
-  document.querySelector("#word-length");
-
-/* ------------------------------
    Game state
    ------------------------------ */
 
-let WORD_LENGTH =
-  DEFAULT_WORD_LENGTH;
+let board = null;
+let statusMessage = null;
+let newGameButton = null;
+let wordLengthSelect = null;
 
+let WORD_LENGTH = DEFAULT_WORD_LENGTH;
 let targetWord = "";
 
 let rows = [];
-
 let currentRow = 0;
-
 let currentTile = 0;
-
 let gameOver = false;
 
-/*
-  Guess dictionaries.
-
-  These contain all words that are legal
-  guesses for each supported length.
-*/
 const wordCollections = {
   4: new Set(),
   5: new Set(),
@@ -143,12 +118,6 @@ const wordCollections = {
   7: new Set()
 };
 
-/*
-  Target collections.
-
-  These contain only words that are eligible
-  to be selected as answers.
-*/
 const targetCollections = {
   4: new Set(),
   5: new Set(),
@@ -160,13 +129,36 @@ let dictionariesLoaded = false;
 let targetListsLoaded = false;
 
 /* ------------------------------
+   Page element initialisation
+   ------------------------------ */
+
+function cachePageElements() {
+  board =
+    document.querySelector(".board");
+
+  statusMessage =
+    document.querySelector(".stage-status");
+
+  newGameButton =
+    document.querySelector("#new-game");
+
+  wordLengthSelect =
+    document.querySelector("#word-length");
+
+  if (!board) {
+    console.error(
+      "Stage 17: .board element was not found."
+    );
+  }
+}
+
+/* ------------------------------
    Status helpers
    ------------------------------ */
 
 function showMessage(message) {
   if (statusMessage) {
-    statusMessage.textContent =
-      message;
+    statusMessage.textContent = message;
   }
 }
 
@@ -194,17 +186,6 @@ function getWordLengthTargets() {
   );
 }
 
-function getRandomWordLength() {
-  const randomIndex =
-    getSecureRandomIndex(
-      SUPPORTED_WORD_LENGTHS.length
-    );
-
-  return SUPPORTED_WORD_LENGTHS[
-    randomIndex
-  ];
-}
-
 function isRandomWordLengthSelected() {
   return (
     wordLengthSelect &&
@@ -218,16 +199,14 @@ function isRandomWordLengthSelected() {
    ------------------------------ */
 
 /*
-  Return a cryptographically stronger random
-  array index where the browser provides
-  crypto.getRandomValues().
+  Uses Web Crypto where available.
 
-  Rejection sampling is used so that the
-  range maps evenly onto the number of
-  available choices.
+  Rejection sampling prevents bias when
+  the number of choices does not divide
+  evenly into the 32-bit random range.
 
-  Math.random() remains as a fallback for
-  environments without Web Crypto.
+  Math.random() is retained only as a
+  fallback for older environments.
 */
 function getSecureRandomIndex(length) {
   if (length <= 0) {
@@ -271,6 +250,17 @@ function getSecureRandomIndex(length) {
   );
 }
 
+function getRandomWordLength() {
+  const randomIndex =
+    getSecureRandomIndex(
+      SUPPORTED_WORD_LENGTHS.length
+    );
+
+  return SUPPORTED_WORD_LENGTHS[
+    randomIndex
+  ];
+}
+
 /* ------------------------------
    Target-word helpers
    ------------------------------ */
@@ -309,14 +299,14 @@ function selectRandomTarget() {
 }
 
 /* ------------------------------
-   JSON word-file loading
+   JSON loading
    ------------------------------ */
 
 /*
-  Load one JSON word list.
+  Load one JSON list.
 
-  This deliberately uses simple page-relative
-  paths because that approach is known to work
+  The function intentionally uses the
+  simple page-relative paths that worked
   correctly on the GitHub Pages deployment.
 */
 async function loadWordList(
@@ -325,7 +315,7 @@ async function loadWordList(
   listName
 ) {
   console.log(
-    `Loading ${listName} from ${filePath}`
+    `Stage 17: Loading ${listName} from ${filePath}`
   );
 
   let response;
@@ -415,7 +405,7 @@ async function loadWordList(
   }
 
   console.log(
-    `Loaded ${words.size} ${length}-letter ${listName}.`
+    `Stage 17: Loaded ${words.size} ${length}-letter ${listName}.`
   );
 
   return words;
@@ -426,47 +416,31 @@ async function loadWordList(
    ------------------------------ */
 
 async function loadDictionaries() {
-  const results =
-    await Promise.allSettled(
-      SUPPORTED_WORD_LENGTHS.map(
-        (length) =>
-          loadWordList(
-            WORD_DATA_FILES[length],
-            length,
-            "guess words"
-          )
-      )
-    );
-
   for (
-    let index = 0;
-    index <
-      SUPPORTED_WORD_LENGTHS.length;
-    index += 1
+    const length of
+      SUPPORTED_WORD_LENGTHS
   ) {
-    const length =
-      SUPPORTED_WORD_LENGTHS[index];
+    try {
+      const words =
+        await loadWordList(
+          WORD_DATA_FILES[length],
+          length,
+          "guess words"
+        );
 
-    const result =
-      results[index];
-
-    if (
-      result.status ===
-      "fulfilled"
-    ) {
       wordCollections[length] =
-        result.value;
-    } else {
-      console.error(
-        `Dictionary loading failed for ${length}-letter words:`,
-        result.reason
-      );
-
+        words;
+    } catch (error) {
       dictionariesLoaded =
         false;
 
+      console.error(
+        `Dictionary loading failed for ${length}-letter words:`,
+        error
+      );
+
       showMessage(
-        `Dictionary error for ${length}-letter words: ${result.reason.message}`
+        `Dictionary error: ${error.message}`
       );
 
       return false;
@@ -477,7 +451,7 @@ async function loadDictionaries() {
     true;
 
   console.log(
-    "All Stage 17 guess dictionaries loaded successfully."
+    "Stage 17: All guess dictionaries loaded successfully."
   );
 
   return true;
@@ -488,47 +462,31 @@ async function loadDictionaries() {
    ------------------------------ */
 
 async function loadTargetLists() {
-  const results =
-    await Promise.allSettled(
-      SUPPORTED_WORD_LENGTHS.map(
-        (length) =>
-          loadWordList(
-            TARGET_DATA_FILES[length],
-            length,
-            "target words"
-          )
-      )
-    );
-
   for (
-    let index = 0;
-    index <
-      SUPPORTED_WORD_LENGTHS.length;
-    index += 1
+    const length of
+      SUPPORTED_WORD_LENGTHS
   ) {
-    const length =
-      SUPPORTED_WORD_LENGTHS[index];
+    try {
+      const targets =
+        await loadWordList(
+          TARGET_DATA_FILES[length],
+          length,
+          "target words"
+        );
 
-    const result =
-      results[index];
-
-    if (
-      result.status ===
-      "fulfilled"
-    ) {
       targetCollections[length] =
-        result.value;
-    } else {
-      console.error(
-        `Target loading failed for ${length}-letter targets:`,
-        result.reason
-      );
-
+        targets;
+    } catch (error) {
       targetListsLoaded =
         false;
 
+      console.error(
+        `Target loading failed for ${length}-letter targets:`,
+        error
+      );
+
       showMessage(
-        `Target-list error for ${length}-letter words: ${result.reason.message}`
+        `Target-list error: ${error.message}`
       );
 
       return false;
@@ -539,23 +497,26 @@ async function loadTargetLists() {
     true;
 
   console.log(
-    "All Stage 17 target lists loaded successfully."
+    "Stage 17: All target lists loaded successfully."
   );
 
   return true;
 }
 
 /* ------------------------------
-   Target validation
+   Target-list validation
    ------------------------------ */
 
 /*
-  A target should also be present in the
+  Target words must also exist in the
   corresponding guess dictionary.
 
-  Otherwise the player could be given an
-  answer that the game refuses to accept
-  as a guess.
+  Instead of stopping the entire game when
+  one target is missing from the dictionary,
+  invalid cross-list targets are removed.
+
+  This means one bad entry cannot prevent
+  the board or game from loading.
 */
 function validateTargetListsAgainstDictionaries() {
   for (
@@ -568,21 +529,55 @@ function validateTargetListsAgainstDictionaries() {
     const words =
       wordCollections[length];
 
+    const validTargets =
+      new Set();
+
+    let removedCount = 0;
+
     for (
       const target of targets
     ) {
       if (
-        !words.has(target)
+        words.has(target)
       ) {
-        throw new Error(
-          `Target "${target}" from targets-${length}.json is not present in words-${length}.json.`
+        validTargets.add(
+          target
+        );
+      } else {
+        removedCount += 1;
+
+        console.warn(
+          `Stage 17: Target "${target}" from targets-${length}.json is not present in words-${length}.json and will not be used.`
         );
       }
+    }
+
+    targetCollections[length] =
+      validTargets;
+
+    console.log(
+      `Stage 17: ${validTargets.size} valid ${length}-letter targets available.`
+    );
+
+    if (
+      removedCount > 0
+    ) {
+      console.warn(
+        `Stage 17: Removed ${removedCount} invalid ${length}-letter target(s).`
+      );
+    }
+
+    if (
+      validTargets.size === 0
+    ) {
+      throw new Error(
+        `No usable ${length}-letter target words remain after validation.`
+      );
     }
   }
 
   console.log(
-    "Stage 17 target lists passed dictionary cross-check."
+    "Stage 17: Target-list validation completed successfully."
   );
 }
 
@@ -609,12 +604,16 @@ function updateInstructions() {
    ------------------------------ */
 
 function createBoard() {
+  /*
+    The board is deliberately independent
+    of JSON loading.
+  */
   if (!board) {
     console.error(
-      "Could not find .board element."
+      "Stage 17: Cannot create board because .board was not found."
     );
 
-    return;
+    return false;
   }
 
   board.innerHTML =
@@ -677,10 +676,16 @@ function createBoard() {
         ".row"
       )
     );
+
+  console.log(
+    `Stage 17: Board created with ${MAX_GUESSES} rows and ${WORD_LENGTH} tiles per row.`
+  );
+
+  return true;
 }
 
 /* ------------------------------
-   Game initialisation
+   Word-length determination
    ------------------------------ */
 
 function determineWordLength() {
@@ -722,6 +727,10 @@ function determineWordLength() {
   }
 }
 
+/* ------------------------------
+   Game initialisation
+   ------------------------------ */
+
 function initialiseGame() {
   if (
     !dictionariesLoaded ||
@@ -740,7 +749,7 @@ function initialiseGame() {
     selectRandomTarget();
   } catch (error) {
     console.error(
-      "Target selection failed:",
+      "Stage 17: Target selection failed:",
       error
     );
 
@@ -1112,12 +1121,9 @@ function submitGuess() {
   }
 
   /*
-    IMPORTANT:
-    Guesses are checked against the
-    general dictionary, NOT the target list.
+    Guesses use the complete dictionary.
 
-    This allows the player to guess valid
-    words that are not eligible answers.
+    The target list is NOT used here.
   */
   if (
     !getWordLengthWords()
@@ -1221,14 +1227,6 @@ function handleWordLengthChange() {
   initialiseGame();
 }
 
-if (wordLengthSelect) {
-  wordLengthSelect
-    .addEventListener(
-      "change",
-      handleWordLengthChange
-    );
-}
-
 /* ------------------------------
    Shared actions
    ------------------------------ */
@@ -1255,101 +1253,94 @@ function handleAction(action) {
    Physical keyboard
    ------------------------------ */
 
-document.addEventListener(
-  "keydown",
-  (event) => {
-    if (
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey
-    ) {
-      return;
+function handlePhysicalKeyboard() {
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      if (
+        event.key ===
+        "Backspace"
+      ) {
+        event.preventDefault();
+
+        handleAction(
+          "backspace"
+        );
+
+        return;
+      }
+
+      if (
+        event.key ===
+        "Enter"
+      ) {
+        event.preventDefault();
+
+        handleAction(
+          "enter"
+        );
+
+        return;
+      }
+
+      if (
+        /^[a-zA-Z]$/.test(
+          event.key
+        )
+      ) {
+        event.preventDefault();
+
+        handleLetter(
+          event.key
+        );
+      }
     }
-
-    if (
-      event.key ===
-      "Backspace"
-    ) {
-      event.preventDefault();
-
-      handleAction(
-        "backspace"
-      );
-
-      return;
-    }
-
-    if (
-      event.key ===
-      "Enter"
-    ) {
-      event.preventDefault();
-
-      handleAction(
-        "enter"
-      );
-
-      return;
-    }
-
-    if (
-      /^[a-zA-Z]$/.test(
-        event.key
-      )
-    ) {
-      event.preventDefault();
-
-      handleLetter(
-        event.key
-      );
-    }
-  }
-);
+  );
+}
 
 /* ------------------------------
    On-screen keyboard
    ------------------------------ */
 
-document.addEventListener(
-  "click",
-  (event) => {
-    const button =
-      event.target.closest(
-        "button[data-key]"
-      );
+function handleOnScreenKeyboard() {
+  document.addEventListener(
+    "click",
+    (event) => {
+      const button =
+        event.target.closest(
+          "button[data-key]"
+        );
 
-    if (!button) {
-      return;
-    }
+      if (!button) {
+        return;
+      }
 
-    const key =
-      button.dataset.key;
+      const key =
+        button.dataset.key;
 
-    if (
-      key === "enter" ||
-      key === "backspace"
-    ) {
-      handleAction(
+      if (
+        key === "enter" ||
+        key === "backspace"
+      ) {
+        handleAction(
+          key
+        );
+
+        return;
+      }
+
+      handleLetter(
         key
       );
-
-      return;
     }
-
-    handleLetter(
-      key
-    );
-  }
-);
-
-/* ------------------------------
-   New Game button
-   ------------------------------ */
-
-if (newGameButton) {
-  newGameButton.addEventListener(
-    "click",
-    startNewGame
   );
 }
 
@@ -1357,33 +1348,56 @@ if (newGameButton) {
    Application startup
    ------------------------------ */
 
-/*
-  Create the board immediately.
-
-  This is intentionally done before the
-  asynchronous JSON loading.
-
-  Therefore a JSON-loading problem cannot
-  cause the board itself to disappear.
-*/
-determineWordLength();
-
-createBoard();
-
-updateInstructions();
-
-/*
-  Load both the general dictionaries and
-  the dedicated target lists.
-
-  The game only starts once all eight
-  JSON files have loaded successfully.
-*/
 async function startApplication() {
+  /*
+    Cache the page elements first.
+  */
+  cachePageElements();
+
+  /*
+    Create the board immediately.
+
+    This is the critical protection against
+    JSON-loading problems hiding the board.
+  */
+  determineWordLength();
+
+  createBoard();
+
+  updateInstructions();
+
+  /*
+    Attach controls immediately as well.
+  */
+  if (wordLengthSelect) {
+    wordLengthSelect.addEventListener(
+      "change",
+      handleWordLengthChange
+    );
+  }
+
+  if (newGameButton) {
+    newGameButton.addEventListener(
+      "click",
+      startNewGame
+    );
+  }
+
+  handlePhysicalKeyboard();
+
+  handleOnScreenKeyboard();
+
+  /*
+    The board now exists regardless of whether
+    the JSON files load successfully.
+  */
   showMessage(
     "Stage 17: Loading game data…"
   );
 
+  /*
+    Load the general guess dictionaries.
+  */
   const dictionariesOk =
     await loadDictionaries();
 
@@ -1391,6 +1405,9 @@ async function startApplication() {
     return;
   }
 
+  /*
+    Load the dedicated target lists.
+  */
   const targetsOk =
     await loadTargetLists();
 
@@ -1398,11 +1415,16 @@ async function startApplication() {
     return;
   }
 
+  /*
+    Make sure every target is also a legal
+    guess. Invalid target entries are removed
+    rather than preventing the game loading.
+  */
   try {
     validateTargetListsAgainstDictionaries();
   } catch (error) {
     console.error(
-      "Target-list validation failed:",
+      "Stage 17 target validation failed:",
       error
     );
 
@@ -1413,8 +1435,26 @@ async function startApplication() {
     return;
   }
 
+  /*
+    Everything required for a playable game
+    is now available.
+  */
   initialiseGame();
 }
 
-startApplication();
+/* ------------------------------
+   Start application safely
+   ------------------------------ */
+
+if (
+  document.readyState ===
+  "loading"
+) {
+  document.addEventListener(
+    "DOMContentLoaded",
+    startApplication
+  );
+} else {
+  startApplication();
+}
 ```
