@@ -11,6 +11,7 @@
 │   ├── PROJECT_BRIEF.md
 │   ├── PROMPT_LOG.md
 │   └── STAGE_PLAN.md
+│   └── TEST_LOG.md
 ├── data/
 │   ├── words-4.json
 │   ├── words-5.json
