@@ -68,12 +68,12 @@ existing five-letter CRANE development configuration.
 Add an accessible player control for choosing from the
 supported word lengths.
 
-[ ] Stage 12 — Multi-length gameplay
+[X] Stage 12 — Multi-length gameplay
 Make target handling, guess validation, evaluation, reset
 behaviour and user-facing instructions work correctly for
 every supported word length.
 
-[ ] Stage 13 — Random word-length mode
+[X] Stage 13 — Random word-length mode
 Add a Random option that selects one of the supported lengths
 whenever a new game begins and clearly tells the player which
 length was selected.
