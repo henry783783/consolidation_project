@@ -1,4 +1,3 @@
-```javascript
 /*
   Wordle-style game
   Stage 17: Separate target-word lists
@@ -608,6 +607,7 @@ function createBoard() {
     The board is deliberately independent
     of JSON loading.
   */
+
   if (!board) {
     console.error(
       "Stage 17: Cannot create board because .board was not found."
@@ -943,6 +943,7 @@ function evaluateGuess(guess) {
     First pass:
     exact matches.
   */
+
   for (
     let index = 0;
     index < WORD_LENGTH;
@@ -964,6 +965,7 @@ function evaluateGuess(guess) {
     Second pass:
     present but incorrectly positioned.
   */
+
   for (
     let index = 0;
     index < WORD_LENGTH;
@@ -1125,6 +1127,7 @@ function submitGuess() {
 
     The target list is NOT used here.
   */
+
   if (
     !getWordLengthWords()
       .has(guess)
@@ -1352,6 +1355,7 @@ async function startApplication() {
   /*
     Cache the page elements first.
   */
+
   cachePageElements();
 
   /*
@@ -1360,6 +1364,7 @@ async function startApplication() {
     This is the critical protection against
     JSON-loading problems hiding the board.
   */
+
   determineWordLength();
 
   createBoard();
@@ -1369,6 +1374,7 @@ async function startApplication() {
   /*
     Attach controls immediately as well.
   */
+
   if (wordLengthSelect) {
     wordLengthSelect.addEventListener(
       "change",
@@ -1391,6 +1397,7 @@ async function startApplication() {
     The board now exists regardless of whether
     the JSON files load successfully.
   */
+
   showMessage(
     "Stage 17: Loading game data…"
   );
@@ -1398,6 +1405,7 @@ async function startApplication() {
   /*
     Load the general guess dictionaries.
   */
+
   const dictionariesOk =
     await loadDictionaries();
 
@@ -1408,6 +1416,7 @@ async function startApplication() {
   /*
     Load the dedicated target lists.
   */
+
   const targetsOk =
     await loadTargetLists();
 
@@ -1420,6 +1429,7 @@ async function startApplication() {
     guess. Invalid target entries are removed
     rather than preventing the game loading.
   */
+
   try {
     validateTargetListsAgainstDictionaries();
   } catch (error) {
@@ -1439,6 +1449,7 @@ async function startApplication() {
     Everything required for a playable game
     is now available.
   */
+
   initialiseGame();
 }
 
@@ -1457,4 +1468,3 @@ if (
 } else {
   startApplication();
 }
-```
