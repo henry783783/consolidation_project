@@ -58,3 +58,62 @@
   - Confirmed that no build tools, packages or backend services were introduced.
   - Confirmed that the repository documentation describes the final architecture and constraints.
   - Completed the final live-site regression test.
+
+[ ] Stage 10 — Dynamic word-length foundation
+Remove hard-coded board dimensions and establish WORD_LENGTH
+as the game's single source of truth while retaining the
+existing five-letter CRANE development configuration.
+
+[ ] Stage 11 — Supported word-length selection
+Add an accessible player control for choosing from the
+supported word lengths.
+
+[ ] Stage 12 — Multi-length gameplay
+Make target handling, guess validation, evaluation, reset
+behaviour and user-facing instructions work correctly for
+every supported word length.
+
+[ ] Stage 13 — Random word-length mode
+Add a Random option that selects one of the supported lengths
+whenever a new game begins and clearly tells the player which
+length was selected.
+
+[ ] Stage 14 — Random target selection
+Replace the fixed CRANE target with random selection from the
+appropriate word collection. A new target must be selected
+whenever a new game begins, including when using New Game.
+
+[ ] Stage 15 — Dictionary/data design
+Establish the definition of an acceptable English word,
+identify a suitable legally redistributable English word
+dataset, and decide how target words and accepted guesses
+should be represented.
+
+[ ] Stage 16 — Expanded dictionary
+Replace the small development dictionary with the selected
+comprehensive word data, filtered and organised for the
+supported word lengths.
+
+[ ] Stage 17 — Dictionary validation and edge cases
+Thoroughly test the expanded word data, including word-length
+filtering, duplicate letters, unusual valid words, invalid
+guesses, target selection and data-loading/error behaviour.
+
+[ ] Stage 18 — Final responsive and accessibility pass
+Review the completed multi-length game across desktop and
+mobile layouts and improve keyboard navigation, focus states,
+screen-reader information, status messages and other
+accessibility issues discovered during testing.
+
+[ ] Stage 19 — Final game-flow and polish pass
+Review the complete game experience end-to-end, including
+starting a game, selecting a length, randomising length,
+making guesses, winning, losing, starting a new game and
+handling unexpected states. Fix only issues identified by
+this review.
+
+[ ] Stage 20 — Optional enhancements
+Review possible additional features such as statistics,
+sharing/results summaries, daily puzzles, hard mode, themes
+and other quality-of-life improvements. Implement only those
+explicitly approved after the core game is complete.
