@@ -25,53 +25,13 @@
       class="board"
       aria-label="Guess board"
     >
-      <div class="row" aria-label="Guess 1">
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-      </div>
+      <!--
+        The JavaScript creates the six guess rows and their tiles.
 
-      <div class="row" aria-label="Guess 2">
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-      </div>
-
-      <div class="row" aria-label="Guess 3">
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-      </div>
-
-      <div class="row" aria-label="Guess 4">
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-      </div>
-
-      <div class="row" aria-label="Guess 5">
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-      </div>
-
-      <div class="row" aria-label="Guess 6">
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-        <div class="tile"></div>
-      </div>
+        Keeping the board container in the HTML allows the game to
+        change the number of letters per row in future stages without
+        requiring a different HTML structure for each word length.
+      -->
     </section>
 
     <p class="evaluation-key" aria-label="Guess result key">
@@ -142,7 +102,7 @@
       role="status"
       aria-live="polite"
     >
-      Stage 8: Polish and accessibility
+      Stage 10: Dynamic word-length foundation
     </p>
 
     <button
